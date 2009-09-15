@@ -30,11 +30,11 @@ setup(name='vigilo-connector-metro',
             ],
         packages=[
             'vigilo',
-            'vigilo.connector-metro',
+            'vigilo.connector_metro',
             ],
         entry_points={
             'console_scripts': [
-                'connector = vigilo.connector-metro.main:daemonize',
+                'connector-metro = vigilo.connector_metro.main:daemonize',
                 ],
             },
         package_dir={'': 'src'},
