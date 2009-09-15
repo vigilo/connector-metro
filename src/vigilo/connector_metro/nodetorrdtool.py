@@ -21,7 +21,7 @@ LOGGER = get_logger(__name__)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-class StoreMeError(Exception): 
+class MetroError(Exception):
     pass
 
 class NodeToRRDtoolForwarder(NodeSubscriber):
@@ -31,13 +31,12 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
     """
 
     def __init__(self, fileconf, subscription):
+        LOGGER.debug("entrée dans NodeToRRDtoolForwarder")
         self.__subscription = subscription
-        NodeSubscriber.__init__(self, [subscription])
         self._fileconf = fileconf
         try :
             settings.load_file(self._fileconf)
         except IOError, e:
-            print "WTF"
             LOGGER.error(_(e))
             raise e
         self._rrd_base_dir = settings['RRD_BASE_DIR']
@@ -46,11 +45,25 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         self.startRRDtoolIfNeeded()
         self.increment = 0
         self.hosts = settings['HOSTS']
+        NodeSubscriber.__init__(self, [subscription])
     
     def startRRDtoolIfNeeded(self):
         """
         Start a Subprocess of rrdtool (if needed) in order to treat command
         """
+        if not os.access(self._rrd_base_dir, os.F_OK):
+            try:
+                os.makedirs(self._rrd_base_dir)
+            except OSError, e:
+                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % \
+                             {'dir': e.filename})
+                raise e
+        if not os.access(self._rrd_base_dir, os.W_OK):
+            LOGGER.error(_("Impossible to write in the directory '%(dir)s'") % \
+                         {'dir': self._rrd_base_dir})
+            raise OSError(_("Impossible to write in the directory '%(dir)s'") % \
+                         {'dir': self._rrd_base_dir})
+
         if self._rrdtool == None:
             self._rrdtool = popen2.Popen3("%s -" % self._rrdbin)
             LOGGER.info(_("started rrdtool subprocess: pid %(pid)d") % \
@@ -76,7 +89,7 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
             lines += res
         if not res.startswith("OK"):
             #print "zut " + lines
-            raise StoreMeError("rrdtool %s %s %s"%(cmd, filename, lines))
+            raise MetroError("rrdtool %s %s %s"%(cmd, filename, lines))
 
     def createRRD(self, filename, perf, dry_run = False):
         """creates a new RRD based on the default fitting configuration"""
@@ -91,10 +104,13 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
             except OSError, e:
                 LOGGER.error(_("Impossible to create the directory '%(dir)s'") % \
                              {'dir': e.filename})
+                raise e
         host_ds = "%(host)s/%(datasource)s" % perf
         if not self.hosts.has_key(host_ds) :
-            raise StoreMeError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
-                               {'host_ds': host_ds, 'fileconf': self._fileconf})
+            LOGGER.error(_("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !") % \
+                         {'host_ds': host_ds, 'fileconf': self._fileconf})
+            raise MetroError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
+                             {'host_ds': host_ds, 'fileconf': self._fileconf})
         
         values = self.hosts["%(host)s/%(datasource)s" % perf ]
         rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
@@ -158,6 +174,7 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         @type  event: xml object
 
         """
+        LOGGER.debug("entrée dans itemsReceived()")
         # See ItemsEvent
         #event.sender
         #event.recipient

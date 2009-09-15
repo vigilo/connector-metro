@@ -38,11 +38,11 @@ class ConnectorServiceMaker(object):
 
         connector_sub = Subscription(
                 JID(settings['VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE']),
-                settings['VIGILO_CONNECTOR_TOPIC'],
+                settings['VIGILO_CONNECTOR_METRO_TOPIC'],
                 node_owner)
 
-        conf_storeme = settings.get('VIGILO_STOREME_CONF', None)
-        msg_consumer = NodeToRRDtoolForwarder(conf_storeme, connector_sub)
+        conf_ = settings.get('VIGILO_METRO_CONF', None)
+        msg_consumer = NodeToRRDtoolForwarder(conf_, connector_sub)
         msg_consumer.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
@@ -87,6 +87,7 @@ def daemonize():
             return(1)
 
         with daemon.DaemonContext(detach_process=True, pidfile=pidfile):
+        #with daemon.DaemonContext(detach_process=False, pidfile=pidfile):
             if stalepid:
                 from vigilo.common.logging import get_logger
                 LOGGER = get_logger(__name__)

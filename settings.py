@@ -1,7 +1,7 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
 import logging
 LOGGING_PLUGINS = (
-        'vigilo.pubsub.logging',       
+#        'vigilo.pubsub.logging',       
         )
 LOGGING_SETTINGS = { 'level': logging.DEBUG, }
 LOGGING_LEVELS = {}
@@ -24,18 +24,14 @@ LOGGING_LEVELS = {
 
 VIGILO_CONNECTOR_DAEMONIZE = True
 VIGILO_CONNECTOR_DAEMONIZE = False
-VIGILO_CONNECTOR_PIDFILE = '/var/lib/vigilo/connector/connector.pid'
+VIGILO_CONNECTOR_PIDFILE = '/var/lib/vigilo/connector-metro/connector-metro.pid'
 VIGILO_CONNECTOR_XMPP_SERVER_HOST = 'tburguie3'
 VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE = 'pubsub.tburguie3'
 # Respect the ejabberd namespacing, for now. It will be too restrictive soon.
-VIGILO_CONNECTOR_JID = 'connectorx@tburguie3'
-VIGILO_CONNECTOR_PASS = 'connectorx'
+VIGILO_CONNECTOR_JID = 'connector-metro@tburguie3'
+VIGILO_CONNECTOR_PASS = 'connector-metro'
 
-VIGILO_CONNECTOR_TOPIC = '/home/tburguie3/connectorx/BUS'
-VIGILO_SOCKETW = '/var/lib/vigilo/connector/recv.sock'
-VIGILO_SOCKETR = '/var/lib/vigilo/connector/send.sock'
-VIGILO_MESSAGE_BACKUP_FILE = '/var/lib/vigilo/connector/backup'
-VIGILO_MESSAGE_BACKUP_TABLE_TOBUS = 'connector_tobus'
+VIGILO_CONNECTOR_METRO_TOPIC = '/home/tburguie3/connectorx/BUS'
+VIGILO_MESSAGE_BACKUP_FILE = '/var/lib/vigilo/connector-metro/backup'
 VIGILO_MESSAGE_BACKUP_TABLE_FROMBUS = 'connector_frombus'
-VIGILO_STOREME_CONF = 'connector-metro.conf.py'
-VIGILO_STOREME_RRDTOOL_BIN = '/usr/bin/rrdtool'
+VIGILO_METRO_CONF = '/etc/connector-metro.conf.py'
