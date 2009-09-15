@@ -34,7 +34,12 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         self.__subscription = subscription
         NodeSubscriber.__init__(self, [subscription])
         self._fileconf = fileconf
-        settings.load_file(self._fileconf)
+        try :
+            settings.load_file(self._fileconf)
+        except IOError, e:
+            print "WTF"
+            LOGGER.error(_(e))
+            raise e
         self._rrd_base_dir = settings['RRD_BASE_DIR']
         self._rrdtool = None
         self._rrdbin = settings['RRD_BIN']

@@ -23,7 +23,7 @@ class ConnectorServiceMaker(object):
 
     def makeService(self):
         """ the service that wraps everything the connector needs. """ 
-        from vigilo.connector.nodetorrdtool import NodeToRRDtoolForwarder
+        from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
         from vigilo.pubsub import NodeOwner, Subscription
         from vigilo.common.conf import settings
         xmpp_client = client.XMPPClient(
