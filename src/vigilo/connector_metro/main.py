@@ -14,7 +14,6 @@ _ = translate(__name__)
 
 
 
-
 class ConnectorServiceMaker(object):
     """
     Creates a service that wraps everything the connector needs.

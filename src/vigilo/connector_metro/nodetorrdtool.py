@@ -43,17 +43,24 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         self.hosts = settings['HOSTS']
     
     def startRRDtoolIfNeeded(self):
+        """
+        Start a Subprocess of rrdtool (if needed) in order to treat command
+        """
         if self._rrdtool == None:
             self._rrdtool = popen2.Popen3("%s -" % self._rrdbin)
-            LOGGER.info(_("started rrdtool subprocess: pid %(pid)d") % {'pid': self._rrdtool.pid})
+            LOGGER.info(_("started rrdtool subprocess: pid %(pid)d") % \
+                        {'pid': self._rrdtool.pid})
         else:
             r = self._rrdtool.poll()
             if r != -1:
                 self._rrdtool = popen2.Popen3("%s -" % "/usr/bin/rrdtool")
-                LOGGER.info(_("rrdtool seemed to exit with return code %(returncode)d, restarting it... pid %(pid)d" % { 'returncode': r, 'pid': self._rrdtool.pid}))
+                LOGGER.info(_("rrdtool seemed to exit with return code %(returncode)d, restarting it... pid %(pid)d" % \
+                            {'returncode': r, 'pid': self._rrdtool.pid}))
 
     def RRDRun(self, cmd, filename, args):
-        """update an RRD by sending it a command to an rrdtool's instance pipe"""
+        """
+        update an RRD by sending it a command to an rrdtool's instance pipe
+        """
         self.startRRDtoolIfNeeded()
         self._rrdtool.tochild.write("%s %s %s\n"%(cmd, filename, args))
         self._rrdtool.tochild.flush()
@@ -77,18 +84,24 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
             try:
                 os.makedirs(basedir)
             except OSError, e:
-                message = "Impossible to create the directory '%s'" % e.filename
-                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % {'dir': e.filename})
+                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % \
+                             {'dir': e.filename})
         host_ds = "%(host)s/%(datasource)s" % perf
         if not self.hosts.has_key(host_ds) :
-            raise StoreMeError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % {'host_ds': host_ds, 'fileconf': self._fileconf})
+            raise StoreMeError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
+                               {'host_ds': host_ds, 'fileconf': self._fileconf})
         
         values = self.hosts["%(host)s/%(datasource)s" % perf ]
         rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
         for rra in values["RRA"]:
-            rrd_cmd.append("RRA:%s:%s:%s:%s" % (rra["type"], rra["xff"], rra["step"], rra["rows"]))
+            rrd_cmd.append("RRA:%s:%s:%s:%s" % \
+                           (rra["type"], rra["xff"], \
+                            rra["step"], rra["rows"]))
+
         for ds in values["DS"]:
-            rrd_cmd.append("DS:%s:%s:%s:%s:%s" % (ds["name"], ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
+            rrd_cmd.append("DS:%s:%s:%s:%s:%s" % \
+                           (ds["name"], ds["type"], ds["heartbeat"], \
+                            ds["min"], ds["max"]))
 
         self.RRDRun("create", filename, " ".join(rrd_cmd))
         if dry_run:
