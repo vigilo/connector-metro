@@ -33,13 +33,14 @@ class ConnectorServiceMaker(object):
         xmpp_client.logTraffic = True
         xmpp_client.setName('xmpp_client')
 
-        node_owner = NodeOwner()
-        node_owner.setHandlerParent(xmpp_client)
+        #node_owner = NodeOwner()
+        #node_owner.setHandlerParent(xmpp_client)
 
         connector_sub = Subscription(
                 JID(settings['VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE']),
                 settings['VIGILO_CONNECTOR_METRO_TOPIC'],
-                node_owner)
+                None)
+                #node_owner)
 
         conf_ = settings.get('VIGILO_METRO_CONF', None)
         msg_consumer = NodeToRRDtoolForwarder(conf_, connector_sub)

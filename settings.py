@@ -32,6 +32,7 @@ VIGILO_CONNECTOR_JID = 'connector-metro@tburguie3'
 VIGILO_CONNECTOR_PASS = 'connector-metro'
 
 VIGILO_CONNECTOR_METRO_TOPIC = '/home/tburguie3/connectorx/BUS'
+#VIGILO_CONNECTOR_METRO_TOPIC = '/home/tburguie3/connector-metro/BUS'
 VIGILO_MESSAGE_BACKUP_FILE = '/var/lib/vigilo/connector-metro/backup'
 VIGILO_MESSAGE_BACKUP_TABLE_FROMBUS = 'connector_frombus'
 VIGILO_METRO_CONF = '/etc/connector-metro.conf.py'

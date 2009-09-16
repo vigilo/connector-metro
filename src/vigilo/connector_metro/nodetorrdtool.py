@@ -21,8 +21,11 @@ LOGGER = get_logger(__name__)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-class MetroError(Exception):
-    pass
+#class MetroError(Exception):
+#    def __init__(self, msg):
+#        self.msg = msg
+#        LOGGER.error(self.msg)
+
 
 class NodeToRRDtoolForwarder(NodeSubscriber):
     """
@@ -88,8 +91,11 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
             res = self._rrdtool.fromchild.readline()
             lines += res
         if not res.startswith("OK"):
-            #print "zut " + lines
-            raise MetroError("rrdtool %s %s %s"%(cmd, filename, lines))
+            LOGGER.error(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
+                         {'cmd': cmd, 'filename': filename, 'msg': lines})
+            #raise MetroError(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
+            #                 {'cmd': cmd, 'filename': filename,
+            #                  'msg': lines})
 
     def createRRD(self, filename, perf, dry_run = False):
         """creates a new RRD based on the default fitting configuration"""
@@ -109,9 +115,10 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         if not self.hosts.has_key(host_ds) :
             LOGGER.error(_("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !") % \
                          {'host_ds': host_ds, 'fileconf': self._fileconf})
-            raise MetroError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
-                             {'host_ds': host_ds, 'fileconf': self._fileconf})
-        
+            #raise MetroError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
+            #                 {'host_ds': host_ds, 'fileconf': self._fileconf})
+            return
+
         values = self.hosts["%(host)s/%(datasource)s" % perf ]
         rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
         for rra in values["RRA"]:
@@ -134,9 +141,24 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         @param msg: message to forward
         @type msg: twisted.words.test.domish Xml
         """
+        LOGGER.debug("entrée dans messageForward()")
+        if msg.name != 'perf':
+            LOGGER.error(_("'%(msgtype)s' is not a valid message type for metrology") % \
+                         {'msgtype' : msg.name})
+            return
         perf = {}
         for c in msg.children:
             perf[c.name.__str__()]=quote(c.children[0].__str__())
+        
+        if 'timestamp' not in perf or 'value' not in perf or \
+           'host' not in perf or 'datasource' not in perf:
+            
+            for i in 'timestamp', 'value', 'host', 'datasource':
+                if i not in perf:
+                    LOGGER.error(_("not a valid perf message (%(i)s is missing '%(perfmsg)s'") % \
+                            {'i': i, 'perfmsg': perf})
+            return
+        
 
         # just to test TODO remove the next lines in production 
         # (the on with the increment of timestamp)
@@ -146,8 +168,7 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
 
         perf['timestamp'] = (timestamp + self.increment).__str__()
 
-        cmd = '%(timestamp)s:' % perf + \
-              '%(value)s' % perf
+        cmd = '%(timestamp)s:%(value)s' % perf
 
         print cmd
 
@@ -179,6 +200,9 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         #event.sender
         #event.recipient
         if event.nodeIdentifier != self.__subscription.node:
+            print event.nodeIdentifier
+            print self.__subscription.node
+            #LOGGER.debug("sortie de itemsReceived() NI='%(NI)s") % {'NI': event.nodeIdentifier}
             return
         #event.headers
         for item in event.items:
