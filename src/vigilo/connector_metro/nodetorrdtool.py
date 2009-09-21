@@ -5,14 +5,15 @@ Extends pubsub clients to compute Node message.
 """
 from __future__ import absolute_import
 
-from twisted.internet import reactor
 #from twisted.words.xish import domish
 
 from vigilo.common.logging import get_logger
 from vigilo.common.conf import settings
-from vigilo.pubsub import  NodeSubscriber
 import os
 import popen2
+from wokkel import xmppim
+from wokkel.pubsub import PubSubClient
+from twisted.words.protocols.jabber import xmlstream
 #import rrdtool
 from urllib import quote
 
@@ -26,16 +27,16 @@ _ = translate(__name__)
 #        self.msg = msg
 #        LOGGER.error(self.msg)
 
-
-class NodeToRRDtoolForwarder(NodeSubscriber):
+class NodeToRRDtoolForwarder(PubSubClient):
     """
     Receives perf messages on the xmpp bus, and passes them to RRDtool.
     Forward Node to RRDtool.
     """
 
-    def __init__(self, fileconf, subscription):
+    def __init__(self, fileconf):
         LOGGER.debug("entrée dans NodeToRRDtoolForwarder")
-        self.__subscription = subscription
+        PubSubClient.__init__(self)
+
         self._fileconf = fileconf
         try :
             settings.load_file(self._fileconf)
@@ -48,8 +49,15 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         self.startRRDtoolIfNeeded()
         self.increment = 0
         self.hosts = settings['HOSTS']
-        NodeSubscriber.__init__(self, [subscription])
+
+
     
+    def connectionInitialized(self):
+        # Called when we are connected and authenticated
+        PubSubClient.connectionInitialized(self)
+        self.send(xmppim.AvailablePresence())
+        self.startRRDtoolIfNeeded()
+
     def startRRDtoolIfNeeded(self):
         """
         Start a Subprocess of rrdtool (if needed) in order to treat command
@@ -93,9 +101,6 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         if not res.startswith("OK"):
             LOGGER.error(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
                          {'cmd': cmd, 'filename': filename, 'msg': lines})
-            #raise MetroError(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
-            #                 {'cmd': cmd, 'filename': filename,
-            #                  'msg': lines})
 
     def createRRD(self, filename, perf, dry_run = False):
         """creates a new RRD based on the default fitting configuration"""
@@ -115,8 +120,6 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
         if not self.hosts.has_key(host_ds) :
             LOGGER.error(_("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !") % \
                          {'host_ds': host_ds, 'fileconf': self._fileconf})
-            #raise MetroError("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !" % \
-            #                 {'host_ds': host_ds, 'fileconf': self._fileconf})
             return
 
         values = self.hosts["%(host)s/%(datasource)s" % perf ]
@@ -196,15 +199,6 @@ class NodeToRRDtoolForwarder(NodeSubscriber):
 
         """
         LOGGER.debug("entrée dans itemsReceived()")
-        # See ItemsEvent
-        #event.sender
-        #event.recipient
-        if event.nodeIdentifier != self.__subscription.node:
-            print event.nodeIdentifier
-            print self.__subscription.node
-            #LOGGER.debug("sortie de itemsReceived() NI='%(NI)s") % {'NI': event.nodeIdentifier}
-            return
-        #event.headers
         for item in event.items:
             # Item is a domish.IElement and a domish.Element
             # Serialize as XML before queueing,

@@ -7,6 +7,7 @@ import os, sys
 from twisted.application import app, service
 from twisted.internet import reactor
 from twisted.words.protocols.jabber.jid import JID
+from vigilo.pubsub.checknode import VerificationNode
 
 from wokkel import client
 from vigilo.common.gettext import translate
@@ -33,17 +34,13 @@ class ConnectorServiceMaker(object):
         xmpp_client.logTraffic = True
         xmpp_client.setName('xmpp_client')
 
-        #node_owner = NodeOwner()
-        #node_owner.setHandlerParent(xmpp_client)
-
-        connector_sub = Subscription(
-                JID(settings['VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE']),
-                settings['VIGILO_CONNECTOR_METRO_TOPIC'],
-                None)
-                #node_owner)
+        list_nodeOwner = settings.get('VIGILO_CONNECTOR_METRO_TOPIC_OWNER', [])
+        list_nodeSubscriber = settings.get('VIGILO_CONNECTOR_METRO_TOPIC', [])
+        verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, doThings=True)
+        verifyNode.setHandlerParent(xmpp_client)
 
         conf_ = settings.get('VIGILO_METRO_CONF', None)
-        msg_consumer = NodeToRRDtoolForwarder(conf_, connector_sub)
+        msg_consumer = NodeToRRDtoolForwarder(conf_)
         msg_consumer.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
@@ -88,7 +85,6 @@ def daemonize():
             return(1)
 
         with daemon.DaemonContext(detach_process=True, pidfile=pidfile):
-        #with daemon.DaemonContext(detach_process=False, pidfile=pidfile):
             if stalepid:
                 from vigilo.common.logging import get_logger
                 LOGGER = get_logger(__name__)
