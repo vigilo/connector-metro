@@ -15,6 +15,7 @@ setup(name='vigilo-connector-metro',
         install_requires=[
             # dashes become underscores
             # order is important (wokkel before Twisted)
+            'setuptools',
             'coverage',
             'nose',
             'pylint',
