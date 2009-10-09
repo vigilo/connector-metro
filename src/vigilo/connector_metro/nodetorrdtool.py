@@ -5,16 +5,13 @@ Extends pubsub clients to compute Node message.
 """
 from __future__ import absolute_import
 
-#from twisted.words.xish import domish
-
 from vigilo.common.logging import get_logger
 from vigilo.common.conf import settings
 import os
-import popen2
+from subprocess import Popen, PIPE
 from wokkel import xmppim
 from wokkel.pubsub import PubSubClient
 from twisted.words.protocols.jabber import xmlstream
-#import rrdtool
 from urllib import quote
 
 LOGGER = get_logger(__name__)
@@ -56,6 +53,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # Called when we are connected and authenticated
         PubSubClient.connectionInitialized(self)
         self.send(xmppim.AvailablePresence())
+        LOGGER.info(_('ConnectionInitialized'))
         self.startRRDtoolIfNeeded()
 
     def startRRDtoolIfNeeded(self):
@@ -76,13 +74,13 @@ class NodeToRRDtoolForwarder(PubSubClient):
                          {'dir': self._rrd_base_dir})
 
         if self._rrdtool == None:
-            self._rrdtool = popen2.Popen3("%s -" % self._rrdbin)
+            self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
             LOGGER.info(_("started rrdtool subprocess: pid %(pid)d") % \
                         {'pid': self._rrdtool.pid})
         else:
             r = self._rrdtool.poll()
-            if r != -1:
-                self._rrdtool = popen2.Popen3("%s -" % "/usr/bin/rrdtool")
+            if r != None:
+                self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
                 LOGGER.info(_("rrdtool seemed to exit with return code %(returncode)d, restarting it... pid %(pid)d" % \
                             {'returncode': r, 'pid': self._rrdtool.pid}))
 
@@ -91,12 +89,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
         update an RRD by sending it a command to an rrdtool's instance pipe
         """
         self.startRRDtoolIfNeeded()
-        self._rrdtool.tochild.write("%s %s %s\n"%(cmd, filename, args))
-        self._rrdtool.tochild.flush()
-        res = self._rrdtool.fromchild.readline()
+        self._rrdtool.stdin.write("%s %s %s\n"%(cmd, filename, args))
+        self._rrdtool.stdin.flush()
+        res = self._rrdtool.stdout.readline()
         lines = res
         while not res.startswith("OK ") and not res.startswith("ERROR: "):
-            res = self._rrdtool.fromchild.readline()
+            res = self._rrdtool.stdout.readline()
             lines += res
         if not res.startswith("OK"):
             LOGGER.error(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
@@ -161,20 +159,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
                     LOGGER.error(_("not a valid perf message (%(i)s is missing '%(perfmsg)s'") % \
                             {'i': i, 'perfmsg': perf})
             return
-        
 
-        # just to test TODO remove the next lines in production 
-        # (the on with the increment of timestamp)
-        self.increment += 1
-        print self.increment
-        timestamp = int(perf['timestamp'])
-
-        perf['timestamp'] = (timestamp + self.increment).__str__()
 
         cmd = '%(timestamp)s:%(value)s' % perf
-
-        print cmd
-
         filename = self._rrd_base_dir + '/%(host)s/%(datasource)s' % perf 
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
@@ -186,8 +173,6 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if not os.path.isfile(filename):
             self.createRRD(filename, perf)
         self.RRDRun('update', filename, cmd)
-        #rrdtool.update(cmd)
-
 
 
     def itemsReceived(self, event):
