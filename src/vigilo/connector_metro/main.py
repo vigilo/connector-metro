@@ -39,7 +39,6 @@ class ConnectorServiceMaker(object):
         verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, 
                                       doThings=True)
         verifyNode.setHandlerParent(xmpp_client)
-        nodetopublish = settings.get('VIGILO_CONNECTOR_TOPIC_PUBLISHER', None)
         _service = JID(settings.get('VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE',
                                     None))
 

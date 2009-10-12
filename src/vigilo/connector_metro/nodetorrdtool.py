@@ -50,6 +50,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     
     def connectionInitialized(self):
+        """ redefinition of the function for loading RRDtool (if needed) """
+
         # Called when we are connected and authenticated
         PubSubClient.connectionInitialized(self)
         self.send(xmppim.AvailablePresence())
@@ -64,14 +66,14 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 os.makedirs(self._rrd_base_dir)
             except OSError, e:
-                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % \
-                             {'dir': e.filename})
+                LOGGER.error(_("Impossible to create the directory " + \
+                               "'%(dir)s'") % {'dir': e.filename})
                 raise e
         if not os.access(self._rrd_base_dir, os.W_OK):
-            LOGGER.error(_("Impossible to write in the directory '%(dir)s'") % \
-                         {'dir': self._rrd_base_dir})
-            raise OSError(_("Impossible to write in the directory '%(dir)s'") % \
-                         {'dir': self._rrd_base_dir})
+            LOGGER.error(_("Impossible to write in the directory " + \
+                           "'%(dir)s'") % {'dir': self._rrd_base_dir})
+            raise OSError(_("Impossible to write in the directory " + \
+                            "'%(dir)s'") % {'dir': self._rrd_base_dir})
 
         if self._rrdtool == None:
             self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
@@ -80,8 +82,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
         else:
             r = self._rrdtool.poll()
             if r != None:
-                self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
-                LOGGER.info(_("rrdtool seemed to exit with return code %(returncode)d, restarting it... pid %(pid)d" % \
+                self._rrdtool = Popen([self._rrdbin, "-"], 
+                                      stdin=PIPE, 
+                                      stdout=PIPE)
+                LOGGER.info(_("rrdtool seemed to exit with return code " + \
+                              "%(returncode)d, restarting it... pid " + \
+                              "%(pid)d" % \
                             {'returncode': r, 'pid': self._rrdtool.pid}))
 
     def RRDRun(self, cmd, filename, args):
@@ -97,7 +103,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
             res = self._rrdtool.stdout.readline()
             lines += res
         if not res.startswith("OK"):
-            LOGGER.error(_("'RRDtool send back Error message on this command '%(cmd)s' with this file '%(filename)s' the message from RRDtool is '%(msg)s") % \
+            LOGGER.error(_("'RRDtool send back Error message on this comm" + \
+                           "and '%(cmd)s' with this file '%(filename)s' t" + \
+                           "he message from RRDtool is '%(msg)s") % \
                          {'cmd': cmd, 'filename': filename, 'msg': lines})
 
     def createRRD(self, filename, perf, dry_run = False):
@@ -111,13 +119,15 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 os.makedirs(basedir)
             except OSError, e:
-                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % \
-                             {'dir': e.filename})
+                LOGGER.error(_("Impossible to create the directory " + \
+                               "'%(dir)s'") % {'dir': e.filename})
                 raise e
         host_ds = "%(host)s/%(datasource)s" % perf
         if not self.hosts.has_key(host_ds) :
-            LOGGER.error(_("Host with this datasource '%(host_ds)s' not found in the configuration file (%(fileconf)s) !") % \
-                         {'host_ds': host_ds, 'fileconf': self._fileconf})
+            LOGGER.error(_("Host with this datasource '%(host_ds)s' not f" + \
+                           "ound in the configuration file (%(fileconf)s)" + \
+                           "!") % \
+                           {'host_ds': host_ds, 'fileconf': self._fileconf})
             return
 
         values = self.hosts["%(host)s/%(datasource)s" % perf ]
@@ -144,8 +154,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
         """
         LOGGER.debug("entrée dans messageForward()")
         if msg.name != 'perf':
-            LOGGER.error(_("'%(msgtype)s' is not a valid message type for metrology") % \
-                         {'msgtype' : msg.name})
+            LOGGER.error(_("'%(msgtype)s' is not a valid message type for" + \
+                           "metrology") % {'msgtype' : msg.name})
             return
         perf = {}
         for c in msg.children:
@@ -156,8 +166,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
             
             for i in 'timestamp', 'value', 'host', 'datasource':
                 if i not in perf:
-                    LOGGER.error(_("not a valid perf message (%(i)s is missing '%(perfmsg)s'") % \
-                            {'i': i, 'perfmsg': perf})
+                    LOGGER.error(_("not a valid perf message (%(i)s is mi" + \
+                                   "ssing '%(perfmsg)s'") % \
+                                   {'i': i, 'perfmsg': perf})
             return
 
 
