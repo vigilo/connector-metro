@@ -39,8 +39,6 @@ class ConnectorServiceMaker(object):
         verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, 
                                       doThings=True)
         verifyNode.setHandlerParent(xmpp_client)
-        _service = JID(settings.get('VIGILO_CONNECTOR_XMPP_PUBSUB_SERVICE',
-                                    None))
 
         bkpfile = settings.get('VIGILO_MESSAGE_BACKUP_FILE', ":memory:")
 
