@@ -31,7 +31,14 @@ class NodeToRRDtoolForwarder(PubSubClient):
     """
 
     def __init__(self, fileconf):
-        LOGGER.debug("entrée dans NodeToRRDtoolForwarder")
+        """
+        Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des 
+        données de performance dans les fichiers RRA.
+
+        @param fileconf: le nom du fichier contenant la définition des hôtes
+        @type fileconf: C{str}
+        """
+
         PubSubClient.__init__(self)
 
         self._fileconf = fileconf
@@ -54,6 +61,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
         # Called when we are connected and authenticated
         PubSubClient.connectionInitialized(self)
+        # add an observer to deal with chat message (oneToOne message)
+        self.xmlstream.addObserver("/message[@type='chat']", self.chatReceived)
+
+        # There's probably a way to configure it (on_sub vs on_sub_and_presence)
+        # but the spec defaults to not sending subscriptions without presence.
         self.send(xmppim.AvailablePresence())
         LOGGER.info(_('ConnectionInitialized'))
         self.startRRDtoolIfNeeded()
@@ -92,7 +104,13 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     def RRDRun(self, cmd, filename, args):
         """
-        update an RRD by sending it a command to an rrdtool's instance pipe
+        update an RRD by sending it a command to an rrdtool's instance pipe.
+        @param cmd: la commande envoyée à RRDtool
+        @type cmd: C{str}
+        @param filename: le nom du fichier RRA.
+        @type filename: C{str}
+        @param cmd: les arguments pour la commande envoyée à RRDtool
+        @type cmd: C{str}
         """
         self.startRRDtoolIfNeeded()
         self._rrdtool.stdin.write("%s %s %s\n"%(cmd, filename, args))
@@ -108,8 +126,16 @@ class NodeToRRDtoolForwarder(PubSubClient):
                            "he message from RRDtool is '%(msg)s") % \
                          {'cmd': cmd, 'filename': filename, 'msg': lines})
 
-    def createRRD(self, filename, perf, dry_run = False):
-        """creates a new RRD based on the default fitting configuration"""
+    def createRRD(self, filename, perf, dry_run=False):
+        """
+        creates a new RRD based on the default fitting configuration.
+        @param filename: le nom du fichier RRA.
+        @type filename: C{str}
+        @param perf: la datasource (host/datasource)
+        @type perf: C{str}
+        @param dry_run: ne pas créer réellement le fichier.
+        @type dry_run: C{boolean}
+        """
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
         # the creation and updating time needs to be different.
@@ -152,7 +178,6 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @param msg: message to forward
         @type msg: twisted.words.test.domish Xml
         """
-        LOGGER.debug("entrée dans messageForward()")
         if msg.name != 'perf':
             LOGGER.error(_("'%(msgtype)s' is not a valid message type for" + \
                            "metrology") % {'msgtype' : msg.name})
@@ -185,16 +210,37 @@ class NodeToRRDtoolForwarder(PubSubClient):
             self.createRRD(filename, perf)
         self.RRDRun('update', filename, cmd)
 
+    def chatReceived(self, msg):
+        """ 
+        function to treat a received chat message 
+        
+        @param msg: msg to treat
+        @type  msg: twisted.words.xish.domish.Element
+
+        """
+        # It should only be one body
+        # Il ne devrait y avoir qu'un seul corps de message (body)
+        bodys = [element for element in msg.elements()
+                         if element.name in ('body',)]
+
+        for b in bodys:
+            # the data we need is just underneath
+            # les données dont on a besoin sont juste en dessous
+            for data in b.elements():
+                LOGGER.debug(_('Message from chat message to forward: ' +
+                               '%s') %
+                               data.toXml().encode('utf8'))
+                self.messageForward(data)
+
 
     def itemsReceived(self, event):
         """ 
         function to treat a received item 
         
         @param event: event to treat
-        @type  event: xml object
+        @type  event: twisted.words.xish.domish.Element
 
         """
-        LOGGER.debug("entrée dans itemsReceived()")
         for item in event.items:
             # Item is a domish.IElement and a domish.Element
             # Serialize as XML before queueing,
