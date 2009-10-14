@@ -33,7 +33,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
     def __init__(self, fileconf):
         """
         Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des 
-        données de performance dans les fichiers RRA.
+        données de performance dans les fichiers RRD.
 
         @param fileconf: le nom du fichier contenant la définition des hôtes
         @type fileconf: C{str}
@@ -107,7 +107,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         update an RRD by sending it a command to an rrdtool's instance pipe.
         @param cmd: la commande envoyée à RRDtool
         @type cmd: C{str}
-        @param filename: le nom du fichier RRA.
+        @param filename: le nom du fichier RRD.
         @type filename: C{str}
         @param cmd: les arguments pour la commande envoyée à RRDtool
         @type cmd: C{str}
@@ -129,7 +129,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
     def createRRD(self, filename, perf, dry_run=False):
         """
         creates a new RRD based on the default fitting configuration.
-        @param filename: le nom du fichier RRA.
+        @param filename: le nom du fichier RRD.
         @type filename: C{str}
         @param perf: la datasource (host/datasource)
         @type perf: C{str}
