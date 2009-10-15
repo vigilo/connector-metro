@@ -204,8 +204,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 os.makedirs(basedir)
             except OSError, e:
-                message = "Impossible to create the directory '%s'" % e.filename
-                print message
+                message = _("Impossible to create the directory '%s'") % e.filename
+                LOGGER.error(message)
         if not os.path.isfile(filename):
             self.createRRD(filename, perf)
         self.RRDRun('update', filename, cmd)
