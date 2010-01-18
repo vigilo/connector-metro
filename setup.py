@@ -2,6 +2,12 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
 from setuptools import setup
 
+tests_require = [
+    'coverage',
+    'nose',
+    'pylint',
+]
+
 setup(name='vigilo-connector-metro',
         version='0.1',
         author='Thomas BURGUIERE',
@@ -16,9 +22,6 @@ setup(name='vigilo-connector-metro',
             # dashes become underscores
             # order is important (wokkel before Twisted)
             'setuptools',
-            'coverage',
-            'nose',
-            'pylint',
             'vigilo-common',
             'vigilo-pubsub',
             'vigilo-connector',
@@ -38,6 +41,9 @@ setup(name='vigilo-connector-metro',
                 'connector-metro = vigilo.connector_metro.main:main',
                 ],
             },
+        extras_require={
+            'tests': tests_require,
+        },
         package_dir={'': 'src'},
         )
 
