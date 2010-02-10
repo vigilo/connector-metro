@@ -7,7 +7,7 @@ Created on 14 oct. 2009
 # Teste la creation d'un fichier RRD 
 from __future__ import absolute_import
 import unittest
-from vigilo.common.conf import settings
+from vigilo.common.conf import settings, ConfigParseError
 from wokkel import client
 from twisted.words.protocols.jabber.jid import JID
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
@@ -55,20 +55,23 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['VIGILO_METRO_CONF'], 'w')
+        file = open(settings['connector-metro']['vigilo_metro_conf'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings.get('VIGILO_METRO_CONF', None)
+        conf_ = settings['connector-metro'].get('vigilo_metro_conf', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['VIGILO_CONNECTOR_JID']),
-            settings['VIGILO_CONNECTOR_PASS'],
-            settings['VIGILO_CONNECTOR_XMPP_SERVER_HOST'])
+            JID(settings['connector-metro']['vigilo_connector_jid']),
+            settings['connector-metro']['vigilo_connector_pass'],
+            settings['connector-metro']['vigilo_connector_xmpp_server_host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
         
         from urllib import quote
-        settings.load_file(conf_)
+        try:
+            settings.load_file(conf_)
+        except (IOError, ConfigParseError):
+            pass
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on test le fichier).
         self.assertRaises(OSError, 
@@ -130,14 +133,14 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['VIGILO_METRO_CONF'], 'w')
+        file = open(settings['connector-metro']['vigilo_metro_conf'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings.get('VIGILO_METRO_CONF', None)
+        conf_ = settings['connector-metro'].get('vigilo_metro_conf', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['VIGILO_CONNECTOR_JID']),
-            settings['VIGILO_CONNECTOR_PASS'],
-            settings['VIGILO_CONNECTOR_XMPP_SERVER_HOST'])
+            JID(settings['connector-metro']['vigilo_connector_jid']),
+            settings['connector-metro']['vigilo_connector_pass'],
+            settings['connector-metro']['vigilo_connector_xmpp_server_host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
