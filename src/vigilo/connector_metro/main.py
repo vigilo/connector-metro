@@ -23,6 +23,7 @@ class ConnectorServiceMaker(object):
         from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
         from vigilo.pubsub.checknode import VerificationNode
         from vigilo.common.conf import settings
+        settings.load_module(__name__)
         from vigilo.common.logging import get_logger
         import os
         LOGGER = get_logger(__name__)

@@ -7,6 +7,7 @@ from __future__ import absolute_import
 
 from vigilo.common.logging import get_logger
 from vigilo.common.conf import settings
+settings.load_module(__name__)
 import os
 from subprocess import Popen, PIPE
 from wokkel import xmppim
