@@ -10,8 +10,8 @@ tests_require = [
 
 setup(name='vigilo-connector-metro',
         version='0.1',
-        author='Thomas BURGUIERE',
-        author_email='thomas.burguiere@c-s.fr',
+        author='Vigilo Team',
+        author_email='contact@projet-vigilo.org',
         url='http://www.projet-vigilo.org/',
         description='vigilo metrology connector component',
         license='http://www.gnu.org/licenses/gpl-2.0.html',
