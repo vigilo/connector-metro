@@ -8,7 +8,7 @@ HOSTS = {}
 # All the RRDs have the same RRAs.
 
 # Load for serveur1.example.com
-HOSTS[quote("serveur1.example.com/Load")] = {
+HOSTS["serveur1.example.com/Load"] = {
     "step": 300,
     "RRA": [
         # on garde ~ deux jours de donnée complète (5 minutes de précision)
@@ -24,7 +24,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }
 
 # HTTP traffic for localhost
-HOSTS["localhost/SFRUUA=="] = { 
+HOSTS["localhost/HTTP"] = { 
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, # on garde deux jours de donnée complète (5 minutes de précision)
@@ -36,7 +36,7 @@ HOSTS["localhost/SFRUUA=="] = {
 }
 
 # Load 01 for localhost
-HOSTS["localhost/TG9hZCAwMQ=="] = {
+HOSTS["localhost/Load%2001"] = {
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -48,7 +48,7 @@ HOSTS["localhost/TG9hZCAwMQ=="] = {
 }
 
 # Load 05 for localhost
-HOSTS["localhost/TG9hZCAwNQ=="] = {
+HOSTS["localhost/Load%2005"] = {
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -60,7 +60,7 @@ HOSTS["localhost/TG9hZCAwNQ=="] = {
 }
 
 # Load 15 for localhost
-HOSTS["localhost/TG9hZCAxNQ=="] = {
+HOSTS["localhost/Load%2015"] = {
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -72,7 +72,7 @@ HOSTS["localhost/TG9hZCAxNQ=="] = {
 }
 
 # Users for localhost
-HOSTS["localhost/VXNlcnM="] = {
+HOSTS["localhost/Users"] = {
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -84,7 +84,7 @@ HOSTS["localhost/VXNlcnM="] = {
 }
 
 # CPU 1min for host2
-HOSTS["host2/Q1BVIDFtaW4="] = { 
+HOSTS["host2/CPU%201min"] = { 
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 },
@@ -96,7 +96,7 @@ HOSTS["host2/Q1BVIDFtaW4="] = {
 }
 
 # CPU 5min for host2
-HOSTS["host2/Q1BVIDVtaW4="] = { 
+HOSTS["host2/CPU%205min"] = { 
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -108,7 +108,7 @@ HOSTS["host2/Q1BVIDVtaW4="] = {
 }
 
 # TCP connections for host2
-HOSTS["host2/VENQIGNvbm5lY3Rpb25z"] = { 
+HOSTS["host2/TCP%20connections"] = { 
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -120,7 +120,7 @@ HOSTS["host2/VENQIGNvbm5lY3Rpb25z"] = {
 }
 
 # inFE0/1 for host2
-HOSTS["host2/aW5GRTAvMQ=="] = { 
+HOSTS["host2/inFE0%2F1"] = { 
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 
@@ -132,7 +132,7 @@ HOSTS["host2/aW5GRTAvMQ=="] = {
 }
 
 # outFE0/1 for host2
-HOSTS["host2/b3V0RkUwLzE="] = {
+HOSTS["host2/outFE0%2F1"] = {
     "step": 300, 
     "RRA": [ 
         { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 }, 

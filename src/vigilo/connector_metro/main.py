@@ -2,12 +2,13 @@
 """ Metrology connector Pubsub client. """
 from __future__ import absolute_import, with_statement
 
+import sys
+
 from twisted.application import app, service
 from twisted.internet import reactor
 from twisted.words.protocols.jabber.jid import JID
-
-
 from wokkel import client
+
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
@@ -28,59 +29,57 @@ class ConnectorServiceMaker(object):
         import os
         LOGGER = get_logger(__name__)
 
+        try:
+            conf_ = settings['connector-metro']['config']
+        except KeyError:
+            LOGGER.error(_("Please set 'config' path to the configuration file."))
+            sys.exit(1)
+
         xmpp_client = client.XMPPClient(
-                JID(settings['bus']['connector_jid']),
-                settings['bus']['connector_pass'],
-                settings['bus']['connector_xmpp_server_host'])
-        xmpp_client.logTraffic = True
+                JID(settings['bus']['jid']),
+                settings['bus']['password'],
+                settings['bus']['host'])
         xmpp_client.setName('xmpp_client')
 
-        list_nodeOwner = settings['bus'].get('connector_topic_owner', [])
-        list_nodeSubscriber = settings['bus'].get('connector_topic', [])
+        try:
+            xmpp_client.logTraffic = settings['bus'].as_bool('log_traffic')
+        except KeyError:
+            xmpp_client.logTraffic = False
+
+        try:
+            list_nodeOwner = settings['bus'].as_list('owned_topics')
+        except KeyError:
+            list_nodeOwner = []
+
+        try:
+            list_nodeSubscriber = settings['bus'].as_list('watched_topics')
+        except KeyError:
+            list_nodeSubscriber = []
+
         verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, 
                                       doThings=True)
         verifyNode.setHandlerParent(xmpp_client)
 
-        bkpfile = settings['connector'].get('VIGILO_MESSAGE_BACKUP_FILE', ":memory:")
+        try:
+            message_consumer = NodeToRRDtoolForwarder(conf_)
+        except OSError, e:
+            LOGGER.exception(e)
+            raise
 
-        i = bkpfile
-        if i != ":memory:" and i is not None:
-            if not os.access(os.path.dirname(i), os.F_OK):
-                msg = _("Directory not found: '%(dir)s'") % \
-                        {'dir': os.path.dirname(i)}
-                LOGGER.error(msg)
-                raise OSError(msg)
-            if not os.access(os.path.dirname(i), os.R_OK):
-                msg = _("Directory not readable: '%(dir)s'") % \
-                        {'dir': os.path.dirname(i)}
-                LOGGER.error(msg)
-                raise OSError(msg)
-            if not os.access(os.path.dirname(i), os.W_OK):
-                msg = _("Directory not writable: '%(dir)s'") % \
-                        {'dir': os.path.dirname(i)}
-                LOGGER.error(msg)
-                raise OSError(msg)
-            if not os.access(os.path.dirname(i), os.X_OK):
-                msg = _("Directory not executable: '%(dir)s'") % \
-                        {'dir': os.path.dirname(i)}
-                LOGGER.error(msg)
-                raise OSError(msg)
-
-        conf_ = settings['connector-metro'].get('metro_conf', None)
-        message_consumer = NodeToRRDtoolForwarder(conf_)
         message_consumer.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
         xmpp_client.setServiceParent(root_service)
         return root_service
 
-def do_main_programm():
+def do_main_program():
     """ main function designed to launch the program """
     application = service.Application('Twisted PubSub component')
     conn_service = ConnectorServiceMaker().makeService()
     conn_service.setServiceParent(application)
     app.startApplication(application, False)
     reactor.run()
+    return 0
 
 def main():
     """ main function designed to launch the program """
@@ -88,9 +87,8 @@ def main():
     from vigilo.common.daemonize import daemonize
     context = daemonize()
     with context:
-        do_main_programm()
-
+        return do_main_program()
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
 

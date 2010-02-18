@@ -8,7 +8,7 @@ Created on 14 oct. 2009
 from __future__ import absolute_import
 import unittest
 from vigilo.common.conf import settings, ConfigParseError
-from vigilo.connector_metro import vigiconf_settings
+from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 from wokkel import client
 from twisted.words.protocols.jabber.jid import JID
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
@@ -24,10 +24,7 @@ class TestCreateRRDFile(unittest.TestCase):
     """
         
     def test_nodeToRRDtool(self):
-        """
-        Vérification que le message qui correpond à un hôte déclaré 
-        créer bien un fichier RRD correspondant.
-        """
+        """Prise en compte de messages sur des hôtes déclarés."""
 
         conf = """# vim: set fileencoding=utf-8 sw=4 ts=4 et :
 from urllib import quote
@@ -56,21 +53,21 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['connector-metro']['metro_conf'], 'w')
+        file = open(settings['connector-metro']['config'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings['connector-metro'].get('metro_conf', None)
+        conf_ = settings['connector-metro'].get('config', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['bus']['connector_jid']),
-            settings['bus']['connector_pass'],
-            settings['bus']['connector_xmpp_server_host'])
+            JID(settings['bus']['jid']),
+            settings['bus']['password'],
+            settings['bus']['host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
         
         from urllib import quote
         try:
-            vigiconf_settings.load_file(conf_)
+            vigiconf_settings.load_configuration(conf_)
         except (IOError, ConfigParseError):
             pass
         # on vérifie que le fichier n'existe pas encore
@@ -101,12 +98,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         
         
     def test_nodeToRRDtool2(self):
-        """ 
-        Vérification que le message qui ne correpond pas à un hôte déclaré
-        ne créer pas le fichier correspondant au message (si l'hôte 
-        n'existe pas dans le fichier de configuration impossible de créer
-        le fichier RRD correspondant).
-        """
+        """Le connecteur doit ignorer les hôtes non-déclarés."""
         conf = """# vim: set fileencoding=utf-8 sw=4 ts=4 et :
 from urllib import quote
 # the directory to store RRD file
@@ -134,20 +126,20 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['connector-metro']['metro_conf'], 'w')
+        file = open(settings['connector-metro']['config'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings['connector-metro'].get('metro_conf', None)
+        conf_ = settings['connector-metro'].get('config', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['bus']['connector_jid']),
-            settings['bus']['connector_pass'],
-            settings['bus']['connector_xmpp_server_host'])
+            JID(settings['bus']['jid']),
+            settings['bus']['password'],
+            settings['bus']['host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
         
         from urllib import quote
-        vigiconf_settings.load_file(conf_)
+        vigiconf_settings.load_configuration(conf_)
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on test le fichier).
         self.assertRaises(OSError, 

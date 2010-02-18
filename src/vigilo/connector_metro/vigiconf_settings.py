@@ -11,7 +11,7 @@ class VigiconfSettings(object):
     Les noms de constantes valides s'écrivent sous la forme : FOO_BAR_BAZ2.
     """
     
-    def __init__(self, filename="connector-metro.conf.py"):
+    def __init__(self):
         """
         Initialisation.
         
@@ -19,8 +19,6 @@ class VigiconfSettings(object):
         @type filename: C{str}
         """
         self.__dct = {}
-        self.filename = filename
-        self.load_configuration(filename)
         
     def __getitem__(self, name):
         if not re.compile('[A-Z][A-Z0-9]*(_[A-Z0-9]+)*').match(name):

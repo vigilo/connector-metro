@@ -38,7 +38,7 @@ setup(name='vigilo-connector-metro',
             ],
         entry_points={
             'console_scripts': [
-                'connector-metro = vigilo.connector_metro.main:main',
+                'vigilo-connector-metro = vigilo.connector_metro.main:main',
                 ],
             },
         extras_require={
