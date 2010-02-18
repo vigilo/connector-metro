@@ -1,12 +1,6 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
 from urllib import quote
 
-# the directory to store RRD file
-RRD_BASE_DIR = '/var/lib/rrds'
-
-# the path to rrdtool binary
-RRD_BIN = '/usr/bin/rrdtool'
-
 # Init the hashmap (mandatory)
 HOSTS = {}
 

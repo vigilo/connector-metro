@@ -8,6 +8,7 @@ Created on 14 oct. 2009
 from __future__ import absolute_import
 import unittest
 from vigilo.common.conf import settings, ConfigParseError
+from vigilo.connector_metro import vigiconf_settings
 from wokkel import client
 from twisted.words.protocols.jabber.jid import JID
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
@@ -55,28 +56,28 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['connector-metro']['vigilo_metro_conf'], 'w')
+        file = open(settings['connector-metro']['metro_conf'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings['connector-metro'].get('vigilo_metro_conf', None)
+        conf_ = settings['connector-metro'].get('metro_conf', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['connector-metro']['vigilo_connector_jid']),
-            settings['connector-metro']['vigilo_connector_pass'],
-            settings['connector-metro']['vigilo_connector_xmpp_server_host'])
+            JID(settings['bus']['connector_jid']),
+            settings['bus']['connector_pass'],
+            settings['bus']['connector_xmpp_server_host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
         
         from urllib import quote
         try:
-            settings.load_file(conf_)
+            vigiconf_settings.load_file(conf_)
         except (IOError, ConfigParseError):
             pass
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on test le fichier).
         self.assertRaises(OSError, 
                 os.stat, 
-                os.path.join(settings['RRD_BASE_DIR'], 
+                os.path.join(settings['connector-metro']['rrd_base_dir'], 
                              quote("serveur1.example.com/Load"))
                 )
         xml = text2xml(
@@ -87,14 +88,14 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         self.assertTrue(
             stat.S_ISREG(
                 os.stat(
-                    os.path.join(settings['RRD_BASE_DIR'],
+                    os.path.join(settings['connector-metro']['rrd_base_dir'],
                                  quote("serveur1.example.com/Load"))).st_mode
             ))
         # un peu de nettoyage
         # shutil.rmtree permet de faire l'equivalent d'un "rm -rf" du 
         #  répertoire/fichier visé
         from shutil import rmtree
-        rmtree(settings['RRD_BASE_DIR'])
+        rmtree(settings['connector-metro']['rrd_base_dir'])
         os.unlink(conf_)
 
         
@@ -133,25 +134,25 @@ HOSTS[quote("serveur1.example.com/Load")] = {
 }"""
         # on créer le fichier de conf
 
-        file = open(settings['connector-metro']['vigilo_metro_conf'], 'w')
+        file = open(settings['connector-metro']['metro_conf'], 'w')
         file.write(conf)
         file.close()
-        conf_ = settings['connector-metro'].get('vigilo_metro_conf', None)
+        conf_ = settings['connector-metro'].get('metro_conf', None)
         xmpp_client = client.XMPPClient(
-            JID(settings['connector-metro']['vigilo_connector_jid']),
-            settings['connector-metro']['vigilo_connector_pass'],
-            settings['connector-metro']['vigilo_connector_xmpp_server_host'])
+            JID(settings['bus']['connector_jid']),
+            settings['bus']['connector_pass'],
+            settings['bus']['connector_xmpp_server_host'])
 
         message_publisher = NodeToRRDtoolForwarder(conf_)
         message_publisher.setHandlerParent(xmpp_client)
         
         from urllib import quote
-        settings.load_file(conf_)
+        vigiconf_settings.load_file(conf_)
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on test le fichier).
         self.assertRaises(OSError, 
                 os.stat, 
-                os.path.join(settings['RRD_BASE_DIR'], 
+                os.path.join(settings['connector-metro']['rrd_base_dir'], 
                              quote("unknown.example.com/Load"))
                 )
         xml = text2xml(
@@ -161,14 +162,14 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         # on vérifie que le fichier correspondant n'a pas été créé
         self.assertRaises(OSError, 
                 os.stat, 
-                os.path.join(settings['RRD_BASE_DIR'], 
+                os.path.join(settings['connector-metro']['rrd_base_dir'], 
                              quote("unknown.example.com/Load"))
                 )
         # un peu de nettoyage
         # shutil.rmtree permet de faire l'equivalent d'un "rm -rf" du 
         #  répertoire/fichier visé
         from shutil import rmtree
-        rmtree(settings['RRD_BASE_DIR'])
+        rmtree(settings['connector-metro']['rrd_base_dir'])
         os.unlink(conf_)
 
 

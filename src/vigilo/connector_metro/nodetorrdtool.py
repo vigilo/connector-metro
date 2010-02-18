@@ -6,8 +6,6 @@ Extends pubsub clients to compute Node message.
 from __future__ import absolute_import
 
 from vigilo.common.logging import get_logger
-from vigilo.common.conf import settings
-settings.load_module(__name__)
 import os
 from subprocess import Popen, PIPE
 from wokkel import xmppim
@@ -19,6 +17,11 @@ LOGGER = get_logger(__name__)
 
 from vigilo.common.gettext import translate
 _ = translate(__name__)
+
+from vigilo.common.conf import settings
+settings.load_module(__name__)
+
+from vigilo.connector_metro import vigiconf_settings
 
 #class MetroError(Exception):
 #    def __init__(self, msg):
@@ -44,16 +47,16 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
         self._fileconf = fileconf
         try :
-            settings.load_file(self._fileconf)
+            vigiconf_settings.load_file(self._fileconf)
         except IOError, e:
             LOGGER.error(_(e))
             raise e
-        self._rrd_base_dir = settings['RRD_BASE_DIR']
+        self._rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         self._rrdtool = None
-        self._rrdbin = settings['RRD_BIN']
+        self._rrdbin = settings['connector-metro']['rrd_bin']
         self.startRRDtoolIfNeeded()
         self.increment = 0
-        self.hosts = settings['HOSTS']
+        self.hosts = vigiconf_settings['HOSTS']
 
 
     

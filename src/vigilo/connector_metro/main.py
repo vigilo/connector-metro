@@ -29,19 +29,19 @@ class ConnectorServiceMaker(object):
         LOGGER = get_logger(__name__)
 
         xmpp_client = client.XMPPClient(
-                JID(settings['connector-metro']['vigilo_connector_jid']),
-                settings['connector-metro']['vigilo_connector_pass'],
-                settings['connector-metro']['vigilo_connector_xmpp_server_host'])
+                JID(settings['bus']['connector_jid']),
+                settings['bus']['connector_pass'],
+                settings['bus']['connector_xmpp_server_host'])
         xmpp_client.logTraffic = True
         xmpp_client.setName('xmpp_client')
 
-        list_nodeOwner = settings['connector-metro'].get('vigilo_connector_topic_owner', [])
-        list_nodeSubscriber = settings['connector-metro'].get('vigilo_connector_topic', [])
+        list_nodeOwner = settings['bus'].get('connector_topic_owner', [])
+        list_nodeSubscriber = settings['bus'].get('connector_topic', [])
         verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, 
                                       doThings=True)
         verifyNode.setHandlerParent(xmpp_client)
 
-        bkpfile = settings.get('VIGILO_MESSAGE_BACKUP_FILE', ":memory:")
+        bkpfile = settings['connector'].get('VIGILO_MESSAGE_BACKUP_FILE', ":memory:")
 
         i = bkpfile
         if i != ":memory:" and i is not None:
@@ -66,7 +66,7 @@ class ConnectorServiceMaker(object):
                 LOGGER.error(msg)
                 raise OSError(msg)
 
-        conf_ = settings['connector-metro'].get('vigilo_metro_conf', None)
+        conf_ = settings['connector-metro'].get('metro_conf', None)
         message_consumer = NodeToRRDtoolForwarder(conf_)
         message_consumer.setHandlerParent(xmpp_client)
 
