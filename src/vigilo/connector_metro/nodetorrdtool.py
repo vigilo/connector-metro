@@ -67,7 +67,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # There's probably a way to configure it (on_sub vs on_sub_and_presence)
         # but the spec defaults to not sending subscriptions without presence.
         self.send(xmppim.AvailablePresence())
-        LOGGER.info(_('ConnectionInitialized'))
+        LOGGER.info(_('Connection initialized'))
         self.startRRDtoolIfNeeded()
 
     def startRRDtoolIfNeeded(self):
@@ -103,7 +103,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         else:
             r = self._rrdtool.poll()
             if r != None:
-                LOGGER.info(_("rrdtool seemed to exit with return code "
+                LOGGER.info(_("RRDtool seemed to exit with return code "
                               "%(returncode)d, restarting it..." % {
                                 'returncode': r,
                             }))
@@ -158,7 +158,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 os.makedirs(basedir)
             except OSError, e:
-                LOGGER.error(_("Impossible to create the directory '%(dir)s'") % {
+                LOGGER.error(_("Unable to create the directory '%(dir)s'") % {
                                 'dir': e.filename,
                             })
                 raise e
@@ -194,7 +194,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type msg: twisted.words.test.domish Xml
         """
         if msg.name != 'perf':
-            LOGGER.error(_("'%(msgtype)s' is not a valid message type for"
+            LOGGER.error(_("'%(msgtype)s' is not a valid message type for "
                            "metrology") % {'msgtype' : msg.name})
             return
         perf = {}
@@ -221,7 +221,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 os.makedirs(basedir)
             except OSError, e:
-                message = _("Impossible to create the directory '%s'") % e.filename
+                message = _("Unable to create the directory '%s'") % e.filename
                 LOGGER.error(message)
         if not os.path.isfile(filename):
             self.createRRD(filename, perf)
