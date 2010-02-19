@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
+import os
 from setuptools import setup
+
+sysconfdir = os.getenv("SYSCONFDIR", "/etc")
+localstatedir = os.getenv("LOCALSTATEDIR", "/var")
 
 tests_require = [
     'coverage',
@@ -45,5 +49,12 @@ setup(name='vigilo-connector-metro',
             'tests': tests_require,
         },
         package_dir={'': 'src'},
+        data_files=[
+                    (os.path.join(sysconfdir, "vigilo/connector-metro"),
+                        ["settings.ini", "connector-metro.conf.py"]),
+                    (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
+                    (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
+                    (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
+                   ],
         )
 

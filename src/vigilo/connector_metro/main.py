@@ -74,7 +74,7 @@ class ConnectorServiceMaker(object):
 
 def do_main_program():
     """ main function designed to launch the program """
-    application = service.Application('Twisted PubSub component')
+    application = service.Application('Vigilo Connector for metrology data')
     conn_service = ConnectorServiceMaker().makeService()
     conn_service.setServiceParent(application)
     app.startApplication(application, False)
@@ -82,12 +82,12 @@ def do_main_program():
     return 0
 
 def main():
-    """ main function designed to launch the program """
-
-    from vigilo.common.daemonize import daemonize
-    context = daemonize()
-    with context:
-        return do_main_program()
+    """Lancement avec Twistd"""
+    import os, sys
+    tac_file = os.path.join(os.path.dirname(__file__), "twisted_service.py")
+    sys.argv[1:1] = ["-y", tac_file]
+    from twisted.scripts.twistd import run
+    run()
 
 if __name__ == '__main__':
     sys.exit(main())
