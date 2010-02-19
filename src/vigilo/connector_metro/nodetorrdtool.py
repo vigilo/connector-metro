@@ -1,7 +1,7 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
-
 """
-Extends pubsub clients to compute Node message.
+Ce module fournit un demi-connecteur capable de lire des messages
+depuis un bus XMPP pour les stocker dans une base de données RRDtool.
 """
 from urllib import quote
 from subprocess import Popen, PIPE
@@ -26,8 +26,8 @@ _ = translate(__name__)
 
 class NodeToRRDtoolForwarder(PubSubClient):
     """
-    Receives perf messages on the xmpp bus, and passes them to RRDtool.
-    Forward Node to RRDtool.
+    Reçoit des données de métrologie (performances) depuis le bus XMPP
+    et les transmet à RRDtool pour générer des base de données RRD.
     """
 
     def __init__(self, fileconf):
@@ -45,18 +45,26 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
         self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
-        signal.signal(signal.SIGHUP, self.reloadConfiguration)
+        signal.signal(signal.SIGHUP, self._sighup_handler)
 
         self._fileconf = fileconf
         self._rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         self._rrdtool = None
         self._rrdbin = settings['connector-metro']['rrd_bin']
-        self.reloadConfiguration(None, None)
+
+        # Provoque le chargement de la configuration
+        # issues de VigiConf.
+        self._sighup_handler(None, None)
+
         self.startRRDtoolIfNeeded()
 
     
     def connectionInitialized(self):
-        """ redefinition of the function for loading RRDtool (if needed) """
+        """
+        Cette méthode est appelée lorsque la connexion est initialisée,
+        c'est-à-dire lorsque la connexion a réussi et que les échanges
+        initiaux (handshakes) sont terminés.
+        """
 
         # Appelé lorsque la connexion est prête (connexion + handshake).
         super(NodeToRRDtoolForwarder, self).connectionInitialized()
@@ -73,7 +81,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     def startRRDtoolIfNeeded(self):
         """
-        Start a Subprocess of rrdtool (if needed) in order to treat command
+        Lance une instance de RRDtool dans un sous-processus
+        afin de traiter les commandes.
         """
         if not os.access(self._rrd_base_dir, os.F_OK):
             try:
@@ -142,13 +151,16 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     def createRRD(self, filename, perf, dry_run=False):
         """
-        creates a new RRD based on the default fitting configuration.
-        @param filename: le nom du fichier RRD.
+        Crée un nouveau fichier RRD avec la configuration adéquate.
+
+        @param filename: Nom du fichier RRD à générer.
         @type filename: C{str}
-        @param perf: la datasource (host/datasource)
+        @param perf: Nom de la source de données, au format "host/datasource"
+            où C{datasource} est encodé avec urllib.quote (RFC 1738).
         @type perf: C{str}
-        @param dry_run: ne pas créer réellement le fichier.
-        @type dry_run: C{boolean}
+        @param dry_run: Indique que les actions ne doivent pas réellement
+            être effectuées (mode simulation).
+        @type dry_run: C{bool}
         """
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
@@ -190,9 +202,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     def messageForward(self, msg):
         """
-        function to forward the message to RRDtool
-        @param msg: message to forward
-        @type msg: twisted.words.test.domish Xml
+        Transmet un message reçu du bus à RRDtool.
+
+        @param msg: Message à transmettre
+        @type msg: C{twisted.words.test.domish Xml}
         """
         if msg.name != 'perf':
             LOGGER.error(_("'%(msgtype)s' is not a valid message type for "
@@ -229,11 +242,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
         self.RRDRun('update', filename, cmd)
 
     def chatReceived(self, msg):
-        """ 
-        function to treat a received chat message 
+        """
+        Fonction de traitement des messages de discussion reçus.
         
-        @param msg: msg to treat
-        @type  msg: twisted.words.xish.domish.Element
+        @param msg: Message à traiter.
+        @type  msg: C{twisted.words.xish.domish.Element}
 
         """
         # Il ne devrait y avoir qu'un seul corps de message (body)
@@ -249,11 +262,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
 
     def itemsReceived(self, event):
-        """ 
-        function to treat a received item 
+        """
+        Fonction de traitement des événements XMPP reçus.
         
-        @param event: event to treat
-        @type  event: twisted.words.xish.domish.Element
+        @param event: Événement XMPP à traiter.
+        @type  event: C{twisted.words.xish.domish.Element}
 
         """
         for item in event.items:
@@ -273,10 +286,20 @@ class NodeToRRDtoolForwarder(PubSubClient):
             for i in it:
                 self.messageForward(i)
 
-    def reloadConfiguration(self, signum, frames):
+    def _sighup_handler(self, signum, frames):
+        """
+        Provoque un rechargement de la configuration Python
+        issue de VigiConf pour le connecteur de métrologie.
+
+        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
+        @type signum: C{int} ou C{None}
+        @param frames: Frames d'exécution interrompues par le signal.
+        @type frames: C{list}
+        """
+
         # Si signum vaut None, alors on a été appelé depuis __init__.
         if signum is not None:
-            LOGGER.info(_("Reloading configuration file"))
+            LOGGER.info(_("Received signal to reload the configuration file"))
 
         try:
             vigiconf_settings.load_configuration(self._fileconf)
