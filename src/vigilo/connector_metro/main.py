@@ -1,7 +1,6 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
 """ Metrology connector Pubsub client. """
-from __future__ import absolute_import, with_statement
-
+from __future__ import with_statement
 import sys
 
 from twisted.application import app, service

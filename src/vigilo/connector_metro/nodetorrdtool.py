@@ -3,12 +3,11 @@
 """
 Extends pubsub clients to compute Node message.
 """
-from __future__ import absolute_import
-
-from subprocess import Popen, PIPE
 from urllib import quote
-import errno
+from subprocess import Popen, PIPE
 import os
+import errno
+import signal
 
 from twisted.words.protocols.jabber import xmlstream
 from wokkel import xmppim
@@ -40,28 +39,30 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type fileconf: C{str}
         """
 
-        PubSubClient.__init__(self)
+        super(NodeToRRDtoolForwarder, self).__init__()
+
+        # Sauvegarde du handler courant pour SIGHUP
+        # et ajout de notre propre handler pour recharger
+        # le connecteur (lors d'un service ... reload).
+        self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
+        signal.signal(signal.SIGHUP, self.reloadConfiguration)
 
         self._fileconf = fileconf
-        try:
-            vigiconf_settings.load_configuration(self._fileconf)
-        except IOError, e:
-            LOGGER.exception(_("Got exception"))
-            raise e
         self._rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         self._rrdtool = None
         self._rrdbin = settings['connector-metro']['rrd_bin']
+        self.reloadConfiguration(None, None)
         self.startRRDtoolIfNeeded()
-        self.increment = 0
-        self.hosts = vigiconf_settings['HOSTS']
 
     
     def connectionInitialized(self):
         """ redefinition of the function for loading RRDtool (if needed) """
 
-        # Called when we are connected and authenticated
-        PubSubClient.connectionInitialized(self)
-        # add an observer to deal with chat message (oneToOne message)
+        # Appelé lorsque la connexion est prête (connexion + handshake).
+        super(NodeToRRDtoolForwarder, self).connectionInitialized()
+
+        # Ajout d'un observateur pour intercepter
+        # les messages de chat "one-to-one".
         self.xmlstream.addObserver("/message[@type='chat']", self.chatReceived)
 
         # There's probably a way to configure it (on_sub vs on_sub_and_presence)
@@ -90,7 +91,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if self._rrdtool is None:
             try:
                 self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
-                LOGGER.info(_("started rrdtool subprocess: pid %(pid)d") % {
+                LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d") % {
                                     'pid': self._rrdtool.pid,
                             })
             except OSError, e:
@@ -131,12 +132,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
             res = self._rrdtool.stdout.readline()
             lines += res
         if not res.startswith("OK"):
-            LOGGER.error(_("'RRDtool send back Error message on this command"
-                           "'%(cmd)s' with this file '%(filename)s'. RRDtool "
-                           "replied with: '%(msg)s'") % {
+            LOGGER.error(_("RRDtool choked on this command '%(cmd)s' using "
+                            "this file '%(filename)s'. RRDtool replied "
+                            "with: '%(msg)s'") % {
                                 'cmd': cmd,
                                 'filename': filename,
-                                'msg': lines,
+                                'msg': lines.strip(),
                             })
 
     def createRRD(self, filename, perf, dry_run=False):
@@ -235,13 +236,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type  msg: twisted.words.xish.domish.Element
 
         """
-        # It should only be one body
         # Il ne devrait y avoir qu'un seul corps de message (body)
         bodys = [element for element in msg.elements()
                          if element.name in ('body',)]
 
         for b in bodys:
-            # the data we need is just underneath
             # les données dont on a besoin sont juste en dessous
             for data in b.elements():
                 LOGGER.debug(_('Chat message to forward: %s') %
@@ -273,4 +272,22 @@ class NodeToRRDtoolForwarder(PubSubClient):
             it = [ it for it in item.elements() if item.name == "item" ]
             for i in it:
                 self.messageForward(i)
+
+    def reloadConfiguration(self, signum, frames):
+        # Si signum vaut None, alors on a été appelé depuis __init__.
+        if signum is not None:
+            LOGGER.info(_("Reloading configuration file"))
+
+        try:
+            vigiconf_settings.load_configuration(self._fileconf)
+        except IOError, e:
+            LOGGER.exception(_("Got exception"))
+            raise e
+        self.hosts = vigiconf_settings['HOSTS']
+
+        # On appelle le précédent handler s'il y en a un.
+        # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
+        # L'appel n'est pas propagé lorsqu'on est appelé par __init__.
+        if callable(self._prev_sighup_handler) and signum is not None:
+            self._prev_sighup_handler(signum, frames)
 
