@@ -73,7 +73,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(-,root,root)
 %doc COPYING
 %dir %{_sysconfdir}/vigilo/
-%config(noreplace) %{_sysconfdir}/vigilo/%{module}
+%dir %{_sysconfdir}/vigilo/%{module}
+%config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
+%{_sysconfdir}/vigilo/%{module}/*.example
 %config(noreplace) %{_sysconfdir}/sysconfig/*
 %dir %{_localstatedir}/lib/vigilo
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd

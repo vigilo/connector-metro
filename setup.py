@@ -51,7 +51,7 @@ setup(name='vigilo-connector-metro',
         package_dir={'': 'src'},
         data_files=[
                     (os.path.join(sysconfdir, "vigilo/connector-metro"),
-                        ["settings.ini", "connector-metro.conf.py"]),
+                        ["settings.ini", "connector-metro.conf.py.example"]),
                     (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
                     (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
                     (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
