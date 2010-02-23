@@ -19,11 +19,11 @@ class VigiconfSettings(object):
         @type filename: C{str}
         """
         self.__dct = {}
+        self.key_re = re.compile('[A-Z][A-Z0-9]*(_[A-Z0-9]+)*')
         
     def __getitem__(self, name):
-        if not re.compile('[A-Z][A-Z0-9]*(_[A-Z0-9]+)*').match(name):
-            # Or maybe ValueError
-            raise KeyError('Invalid name', name)
+        if not self.key_re.match(name):
+            raise ValueError('Invalid name', name)
         return self.__dct[name]
 
 

@@ -3,7 +3,6 @@
 Ce module fournit un demi-connecteur capable de lire des messages
 depuis un bus XMPP pour les stocker dans une base de données RRDtool.
 """
-from urllib import quote
 from subprocess import Popen, PIPE
 import os
 import errno
@@ -23,6 +22,8 @@ from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 LOGGER = get_logger(__name__)
 _ = translate(__name__)
 
+
+class NodeToRRDtoolForwarderError(Exception): pass
 
 class NodeToRRDtoolForwarder(PubSubClient):
     """
@@ -155,9 +156,13 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
         @param filename: Nom du fichier RRD à générer.
         @type filename: C{str}
-        @param perf: Nom de la source de données, au format "host/datasource"
-            où C{datasource} est encodé avec urllib.quote (RFC 1738).
-        @type perf: C{str}
+        @param perf: Dictionnaire décrivant la source de données, contenant les
+            clés suivantes:
+             - C{host}: nom d'hôte
+             - C{datasource}: nom de l'indicateur, qui doit être encodé avec
+               urllib.quote (RFC 1738).
+             - C{timestamp}: timestamp UNIX de la mise à jour
+        @type perf: C{dict}
         @param dry_run: Indique que les actions ne doivent pas réellement
             être effectuées (mode simulation).
         @type dry_run: C{bool}
@@ -165,7 +170,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
         # the creation and updating time needs to be different.
-        timestamp = int("%(timestamp)s" % perf) - 10 
+        timestamp = int(perf["timestamp"]) - 10 
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
             try:
@@ -175,26 +180,27 @@ class NodeToRRDtoolForwarder(PubSubClient):
                                 'dir': e.filename,
                             })
                 raise e
-        host_ds = "%(host)s/%(datasource)s" % perf
-        if not self.hosts.has_key(host_ds) :
-            LOGGER.error(_("Host with this datasource '%(host_ds)s' not found "
+        host = perf["host"]
+        ds = perf["datasource"]
+        if host not in self.hosts or ds not in self.hosts[host]:
+            LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
                             "in the configuration file (%(fileconf)s) !") % {
-                                'host_ds': host_ds,
+                                'host': host, 'ds': ds,
                                 'fileconf': self._fileconf,
                         })
-            return
+            raise NodeToRRDtoolForwarderError()
 
-        values = self.hosts["%(host)s/%(datasource)s" % perf ]
+        values = self.hosts[host][ds]
         rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
         for rra in values["RRA"]:
             rrd_cmd.append("RRA:%s:%s:%s:%s" % \
                            (rra["type"], rra["xff"], \
                             rra["step"], rra["rows"]))
 
-        for ds in values["DS"]:
-            rrd_cmd.append("DS:%s:%s:%s:%s:%s" % \
-                           (ds["name"], ds["type"], ds["heartbeat"], \
-                            ds["min"], ds["max"]))
+        ds_tpl = values["DS"]
+        rrd_cmd.append("DS:%s:%s:%s:%s:%s" % \
+                   (ds_tpl["name"], ds_tpl["type"], ds_tpl["heartbeat"], \
+                    ds_tpl["min"], ds_tpl["max"]))
 
         self.RRDRun("create", filename, " ".join(rrd_cmd))
         if dry_run:
@@ -213,7 +219,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             return
         perf = {}
         for c in msg.children:
-            perf[c.name.__str__()]=quote(c.children[0].__str__())
+            perf[str(c.name)] = str(c.children[0])
         
         if 'timestamp' not in perf or 'value' not in perf or \
            'host' not in perf or 'datasource' not in perf:
@@ -229,7 +235,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = self._rrd_base_dir + '/%(host)s/%(datasource)s' % perf 
+        filename = os.path.join(self._rrd_base_dir, perf["host"],
+                                "%s.rrd" % perf["datasource"])
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
             try:
@@ -238,7 +245,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
                 message = _("Unable to create the directory '%s'") % e.filename
                 LOGGER.error(message)
         if not os.path.isfile(filename):
-            self.createRRD(filename, perf)
+            try:
+                self.createRRD(filename, perf)
+            except NodeToRRDtoolForwarderError, e:
+                return # On saute cette mise à jour
         self.RRDRun('update', filename, cmd)
 
     def chatReceived(self, msg):
