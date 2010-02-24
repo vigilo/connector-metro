@@ -36,8 +36,9 @@ RRD_BIN = '/usr/bin/rrdtool'
 HOSTS = {}
 # In this setup, we create one RRD per DS, each in a folder named after the host.
 # All the RRDs have the same RRAs.
-# Load for serveur1.example.com
-HOSTS[quote("serveur1.example.com/Load")] = {
+# Load for server1.example.com
+HOSTS["server1.example.com"] = {}
+HOSTS["server1.example.com"]["Load"] = {
     "step": 300,
     "RRA": [
         # on garde ~ deux jours de donnée complète (5 minutes de précision)
@@ -49,7 +50,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         # on garde ~ deux ans précision 1 jour
         { "type": "AVERAGE", "xff": 0.5, "step": 288, "rows": 797}
     ],
-    "DS": [ { "name": "DS", "type": "GAUGE", "heartbeat": 600, "min": "U", "max": "U" } ],
+    "DS": { "name": "DS", "type": "GAUGE", "heartbeat": 600, "min": "U", "max": "U" },
 }"""
         # on créer le fichier de conf
 
@@ -75,10 +76,10 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         self.assertRaises(OSError, 
                 os.stat, 
                 os.path.join(settings['connector-metro']['rrd_base_dir'], 
-                             quote("serveur1.example.com/Load"))
+                             "server1.example.com", "%s.rrd" % quote("Load"))
                 )
         xml = text2xml(
-                "perf|1165939739|serveur1.example." +
+                "perf|1165939739|server1.example." +
                 "com|Load|12")
         message_publisher.messageForward(xml)
         # on vérifie que le fichier correspondant a bien été créé
@@ -86,7 +87,8 @@ HOSTS[quote("serveur1.example.com/Load")] = {
             stat.S_ISREG(
                 os.stat(
                     os.path.join(settings['connector-metro']['rrd_base_dir'],
-                                 quote("serveur1.example.com/Load"))).st_mode
+                                 "server1.example.com", "%s.rrd" %
+                                 quote("Load"))).st_mode
             ))
         # un peu de nettoyage
         # shutil.rmtree permet de faire l'equivalent d'un "rm -rf" du 
@@ -109,8 +111,9 @@ RRD_BIN = '/usr/bin/rrdtool'
 HOSTS = {}
 # In this setup, we create one RRD per DS, each in a folder named after the host.
 # All the RRDs have the same RRAs.
-# Load for serveur1.example.com
-HOSTS[quote("serveur1.example.com/Load")] = {
+# Load for server1.example.com
+HOSTS["server1.example.com"] = {}
+HOSTS["server1.example.com"]["Load"] = {
     "step": 300,
     "RRA": [
         # on garde ~ deux jours de donnée complète (5 minutes de précision)
@@ -122,7 +125,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         # on garde ~ deux ans précision 1 jour
         { "type": "AVERAGE", "xff": 0.5, "step": 288, "rows": 797}
     ],
-    "DS": [ { "name": "DS", "type": "GAUGE", "heartbeat": 600, "min": "U", "max": "U" } ],
+    "DS": { "name": "DS", "type": "GAUGE", "heartbeat": 600, "min": "U", "max": "U" },
 }"""
         # on créer le fichier de conf
 
@@ -145,7 +148,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         self.assertRaises(OSError, 
                 os.stat, 
                 os.path.join(settings['connector-metro']['rrd_base_dir'], 
-                             quote("unknown.example.com/Load"))
+                             "unknown.example.com", "%s.rrd" % quote("Load"))
                 )
         xml = text2xml(
                 "perf|1165939739|unknown.example." +
@@ -155,7 +158,7 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         self.assertRaises(OSError, 
                 os.stat, 
                 os.path.join(settings['connector-metro']['rrd_base_dir'], 
-                             quote("unknown.example.com/Load"))
+                             "unknown.example.com", "%s.rrd" % quote("Load"))
                 )
         # un peu de nettoyage
         # shutil.rmtree permet de faire l'equivalent d'un "rm -rf" du 
@@ -164,8 +167,5 @@ HOSTS[quote("serveur1.example.com/Load")] = {
         rmtree(settings['connector-metro']['rrd_base_dir'])
         os.unlink(conf_)
 
-
-
-    
 if __name__ == "__main__": 
     unittest.main()
