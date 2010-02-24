@@ -18,7 +18,6 @@ BuildRequires:   python-setuptools
 Requires:   python >= 2.5
 Requires:   python-setuptools
 Requires:   vigilo-common vigilo-pubsub vigilo-connector
-Requires:   python-twisted-words python-twisted-names wokkel
 Requires:   rrdtool
 
 Requires(pre): rpm-helper
