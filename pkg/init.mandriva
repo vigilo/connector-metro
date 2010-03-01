@@ -39,7 +39,7 @@ start() {
 	[ -f $LOCK_FILE ] && return
 
 	echo -n "Starting $NAME: "
-	daemon --user $USER $DAEMON --pidfile $PID_FILE $OPTIONS
+	daemon --user $USER $DAEMON --pidfile $PID_FILE --logfile /dev/null $OPTIONS
 	RETVAL=$?
 	echo
 	[ $RETVAL -eq 0 ] && touch $LOCK_FILE
