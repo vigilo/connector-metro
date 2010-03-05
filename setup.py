@@ -27,10 +27,7 @@ setup(name='vigilo-connector-metro',
             # order is important (wokkel before Twisted)
             'setuptools',
             'vigilo-common',
-            'vigilo-pubsub',
             'vigilo-connector',
-            'wokkel',
-            'Twisted',
             #'rrdtool',
             ],
         namespace_packages = [

@@ -1,7 +1,7 @@
 %define module  connector-metro
 %define name    vigilo-%{module}
 %define version 1.0
-%define release 1
+%define release 1%{?svn}
 
 Name:       %{name}
 Summary:    Vigilo Metrology connector
@@ -47,13 +47,6 @@ make install \
 # Mandriva splits Twisted
 sed -i -e 's/^Twisted$/Twisted_Words/' $RPM_BUILD_ROOT%{_prefix}/lib*/python*/site-packages/vigilo_connector_metro-*-py*.egg-info/requires.txt
 
-# Listed explicitely in %%files as %%config:
-grep -v '^%{_sysconfdir}/%{name}/' INSTALLED_FILES \
-	| grep -v '^%{_sysconfdir}/sysconfig' \
-	| grep -v '^%{_localstatedir}' \
-	> INSTALLED_FILES.filtered
-mv -f INSTALLED_FILES.filtered INSTALLED_FILES
-
 
 %pre
 %_pre_useradd vigilo-metro %{_localstatedir}/lib/vigilo/rrd /bin/false
@@ -68,14 +61,17 @@ mv -f INSTALLED_FILES.filtered INSTALLED_FILES
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files -f INSTALLED_FILES
+%files
 %defattr(-,root,root)
 %doc COPYING
+%{_bindir}/%{name}
+%{_initrddir}/%{name}
 %dir %{_sysconfdir}/vigilo/
 %dir %{_sysconfdir}/vigilo/%{module}
 %config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
 %{_sysconfdir}/vigilo/%{module}/*.example
 %config(noreplace) %{_sysconfdir}/sysconfig/*
+%{python_sitelib}/*
 %dir %{_localstatedir}/lib/vigilo
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
