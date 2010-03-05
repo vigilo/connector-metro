@@ -17,7 +17,7 @@ BuildRequires:   python-setuptools
 
 Requires:   python >= 2.5
 Requires:   python-setuptools
-Requires:   vigilo-common vigilo-pubsub vigilo-connector
+Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
 
 Requires(pre): rpm-helper
@@ -43,9 +43,6 @@ make install \
 	SYSCONFDIR=%{_sysconfdir} \
 	LOCALSTATEDIR=%{_localstatedir} \
 	PYTHON=%{_bindir}/python
-
-# Mandriva splits Twisted
-sed -i -e 's/^Twisted$/Twisted_Words/' $RPM_BUILD_ROOT%{_prefix}/lib*/python*/site-packages/vigilo_connector_metro-*-py*.egg-info/requires.txt
 
 
 %pre
