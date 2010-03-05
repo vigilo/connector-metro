@@ -14,6 +14,7 @@ BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
 License:    GPLv2
 
 BuildRequires:   python-setuptools
+BuildRequires:   python-babel
 
 Requires:   python >= 2.5
 Requires:   python-setuptools
@@ -44,6 +45,8 @@ make install \
 	LOCALSTATEDIR=%{_localstatedir} \
 	PYTHON=%{_bindir}/python
 
+%find_lang %{name}
+
 
 %pre
 %_pre_useradd vigilo-metro %{_localstatedir}/lib/vigilo/rrd /bin/false
@@ -58,7 +61,7 @@ make install \
 %clean
 rm -rf $RPM_BUILD_ROOT
 
-%files
+%files -f %{name}.lang
 %defattr(-,root,root)
 %doc COPYING
 %{_bindir}/%{name}
