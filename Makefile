@@ -4,6 +4,7 @@ PKGNAME := vigilo-connector-metro
 SYSCONFDIR := /etc
 LOCALSTATEDIR := /var
 VARDIR := $(LOCALSTATEDIR)/lib/$(PKGNAME)
+USER := vigilo-metro
 DESTDIR = 
 
 define find-distro
@@ -29,13 +30,22 @@ all: build settings.ini
 settings.ini: settings.ini.in
 	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
 
-install:
+install: install_files install_permissions
+
+install_files:
 	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR) --record=INSTALLED_FILES
 	# init
 	install -p -m 755 -D pkg/init.$(DISTRO) $(DESTDIR)/etc/rc.d/init.d/$(PKGNAME)
 	echo /etc/rc.d/init.d/$(PKGNAME) >> INSTALLED_FILES
 	install -p -m 644 -D pkg/initconf.$(DISTRO) $(DESTDIR)$(INITCONFDIR)/$(PKGNAME)
 	echo $(INITCONFDIR)/$(PKGNAME) >> INSTALLED_FILES
+
+install_permissions:
+	chown $(USER):$(USER) \
+			$(LOCALSTATEDIR)/lib/vigilo/rrd \
+			$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
+			$(LOCALSTATEDIR)/run/$(NAME)
+	chmod 755 $(LOCALSTATEDIR)/lib/vigilo/rrd
 
 clean: clean_python
 	rm -f settings.ini

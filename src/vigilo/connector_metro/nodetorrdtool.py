@@ -5,6 +5,7 @@ depuis un bus XMPP pour les stocker dans une base de données RRDtool.
 """
 from subprocess import Popen, PIPE
 import os
+import stat
 import errno
 import signal
 
@@ -88,6 +89,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if not os.access(self._rrd_base_dir, os.F_OK):
             try:
                 os.makedirs(self._rrd_base_dir)
+                os.chmod(self._rrd_base_dir, # chmod 755
+                         stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR |\
+                         stat.S_IRGRP | stat.S_IXGRP | \
+                         stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
                 raise OSError(_("Unable to create directory '%(dir)s'") % {
                                 'dir': e.filename,

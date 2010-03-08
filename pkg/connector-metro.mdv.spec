@@ -38,7 +38,7 @@ make PYTHON=%{_bindir}/python
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install \
+make install_files \
 	DESTDIR=$RPM_BUILD_ROOT \
 	PREFIX=%{_prefix} \
 	SYSCONFDIR=%{_sysconfdir} \
@@ -73,7 +73,7 @@ rm -rf $RPM_BUILD_ROOT
 %config(noreplace) %{_sysconfdir}/sysconfig/*
 %{python_sitelib}/*
 %dir %{_localstatedir}/lib/vigilo
-%attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd
+%attr(644,vigilo-metro,vigilo-metro,755) %{_localstatedir}/lib/vigilo/rrd
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/%{name}
 
