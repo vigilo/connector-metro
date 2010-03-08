@@ -24,8 +24,10 @@ else
 	INITCONFDIR = /etc/sysconfig
 endif
 
-all: build
-	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' settings.ini.in > settings.ini
+all: build settings.ini
+
+settings.ini: settings.ini.in
+	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
 
 install:
 	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR) --record=INSTALLED_FILES
