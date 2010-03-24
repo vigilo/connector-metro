@@ -180,6 +180,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if not os.path.exists(basedir):
             try:
                 os.makedirs(basedir)
+                os.chmod(basedir, # chmod 755
+                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
+                         stat.S_IRGRP | stat.S_IXGRP | \
+                         stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
                 LOGGER.error(_("Unable to create the directory '%(dir)s'") % {
                                 'dir': e.filename,
@@ -208,6 +212,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
                     ds_tpl["min"], ds_tpl["max"]))
 
         self.RRDRun("create", filename, " ".join(rrd_cmd))
+        os.chmod(filename, # chmod 644
+                 stat.S_IRUSR | stat.S_IWUSR | \
+                 stat.S_IRGRP | stat.S_IROTH )
         if dry_run:
             os.remove(filename)
 
@@ -246,6 +253,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if not os.path.exists(basedir):
             try:
                 os.makedirs(basedir)
+                os.chmod(basedir, # chmod 755
+                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
+                         stat.S_IRGRP | stat.S_IXGRP | \
+                         stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
                 message = _("Unable to create the directory '%s'") % e.filename
                 LOGGER.error(message)
