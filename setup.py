@@ -43,7 +43,6 @@ setup(name='vigilo-connector-metro',
             'setuptools',
             'vigilo-common',
             'vigilo-connector',
-            #'rrdtool',
             ],
         namespace_packages = [
             'vigilo',
