@@ -106,7 +106,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if self._rrdtool is None:
             try:
                 self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
-                LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d") % {
+                LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d"), {
                                     'pid': self._rrdtool.pid,
                             })
             except OSError, e:
@@ -120,9 +120,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
             r = self._rrdtool.poll()
             if r != None:
                 LOGGER.info(_("RRDtool seemed to exit with return code "
-                              "%(returncode)d, restarting it..." % {
+                              "%(returncode)d, restarting it..."), {
                                 'returncode': r,
-                            }))
+                            })
                 # Force la création d'un nouveau processus
                 # pour remplacer celui qui vient de mourir.
                 self._rrdtool = None
@@ -149,7 +149,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if not res.startswith("OK"):
             LOGGER.error(_("RRDtool choked on this command '%(cmd)s' using "
                             "this file '%(filename)s'. RRDtool replied "
-                            "with: '%(msg)s'") % {
+                            "with: '%(msg)s'"), {
                                 'cmd': cmd,
                                 'filename': filename,
                                 'msg': lines.strip(),
@@ -185,7 +185,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
                          stat.S_IRGRP | stat.S_IXGRP | \
                          stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
-                LOGGER.error(_("Unable to create the directory '%(dir)s'") % {
+                LOGGER.error(_("Unable to create the directory '%(dir)s'"), {
                                 'dir': e.filename,
                             })
                 raise e
@@ -193,7 +193,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         ds = perf["datasource"]
         if host not in self.hosts or ds not in self.hosts[host]:
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
-                            "in the configuration file (%(fileconf)s) !") % {
+                            "in the configuration file (%(fileconf)s) !"), {
                                 'host': host, 'ds': ds,
                                 'fileconf': self._fileconf,
                         })
@@ -227,23 +227,19 @@ class NodeToRRDtoolForwarder(PubSubClient):
         """
         if msg.name != 'perf':
             LOGGER.error(_("'%(msgtype)s' is not a valid message type for "
-                           "metrology") % {'msgtype' : msg.name})
+                           "metrology"), {'msgtype' : msg.name})
             return
         perf = {}
         for c in msg.children:
             perf[str(c.name)] = str(c.children[0])
-        
-        if 'timestamp' not in perf or 'value' not in perf or \
-           'host' not in perf or 'datasource' not in perf:
-            
-            for i in 'timestamp', 'value', 'host', 'datasource':
-                if i not in perf:
-                    LOGGER.error(_("not a valid perf message (%(i)s is missing "
-                                   "'%(perfmsg)s')") % {
-                                        'i': i,
-                                        'perfmsg': perf,
-                                    })
-            return
+
+        for i in 'timestamp', 'value', 'host', 'datasource':
+            if i not in perf:
+                LOGGER.error(_(u"Not a valid performance message (missing "
+                               "'%(tag)s' tag)"), {
+                                    'tag': i,
+                                })
+                return
 
 
         cmd = '%(timestamp)s:%(value)s' % perf
@@ -258,8 +254,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
                          stat.S_IRGRP | stat.S_IXGRP | \
                          stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
-                message = _("Unable to create the directory '%s'") % e.filename
-                LOGGER.error(message)
+                LOGGER.error(_("Unable to create the directory '%s'"),
+                    e.filename)
         if not os.path.isfile(filename):
             try:
                 self.createRRD(filename, perf)
@@ -282,7 +278,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         for b in bodys:
             # les données dont on a besoin sont juste en dessous
             for data in b.elements():
-                LOGGER.debug(_('Chat message to forward: %s') %
+                LOGGER.debug(_('Chat message to forward: %s'),
                                data.toXml().encode('utf8'))
                 self.messageForward(data)
 
