@@ -20,6 +20,18 @@ Requires:   python >= 2.5
 Requires:   python-setuptools
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
+######### Dependance from python dependance tree ########
+Requires:   vigilo-pubsub
+Requires:   vigilo-connector
+Requires:   vigilo-common
+Requires:   python-twisted
+Requires:   python-wokkel
+Requires:   python-configobj
+Requires:   python-babel
+Requires:   python-zope-interface
+Requires:   python-setuptools
+Requires:   python-twisted
+Requires:   python-wokkel
 
 Requires(pre): rpm-helper
 
