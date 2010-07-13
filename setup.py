@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
-import os
+import os, sys
 from setuptools import setup
 
 sysconfdir = os.getenv("SYSCONFDIR", "/etc")
@@ -66,6 +66,6 @@ setup(name='vigilo-connector-metro',
                     (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
                     (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
                     (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
-                   ] + install_i18n("i18n", "/usr/share/locale"),
+                   ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
         )
 
