@@ -58,11 +58,11 @@ keys=syslog,console
 keys=consoleFormatter,syslogFormatter
 
 [logger_root]
-level=DEBUG
+level=INFO
 handlers=syslog,console
  
 [logger_twisted]
-level=DEBUG
+level=INFO
 qualname=twisted
 propagate=0
 handlers=syslog,console
