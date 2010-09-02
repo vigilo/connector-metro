@@ -1,31 +1,11 @@
 NAME := connector_metro
-PKGNAME := vigilo-connector-metro
-#PREFIX = /usr
-SYSCONFDIR := /etc
-LOCALSTATEDIR := /var
 VARDIR := $(LOCALSTATEDIR)/lib/$(PKGNAME)
 USER := vigilo-metro
-DESTDIR = 
-
-define find-distro
-if [ -f /etc/debian_version ]; then \
-	echo "debian" ;\
-elif [ -f /etc/mandriva-release ]; then \
-	echo "mandriva" ;\
-else \
-	echo "unknown" ;\
-fi
-endef
-DISTRO := $(shell $(find-distro))
-ifeq ($(DISTRO),debian)
-	INITCONFDIR = /etc/default
-else ifeq ($(DISTRO),mandriva)
-	INITCONFDIR = /etc/sysconfig
-else
-	INITCONFDIR = /etc/sysconfig
-endif
 
 all: build settings.ini
+
+include buildenv/Makefile.common
+PKGNAME := vigilo-connector-metro
 
 settings.ini: settings.ini.in
 	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
@@ -50,6 +30,5 @@ install_permissions:
 clean: clean_python
 	rm -f settings.ini
 
-include buildenv/Makefile.common
 lint: lint_pylint
 tests: tests_nose
