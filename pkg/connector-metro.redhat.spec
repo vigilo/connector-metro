@@ -18,6 +18,7 @@ URL:        http://www.projet-vigilo.org
 Group:      System/Servers
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
 License:    GPLv2
+Buildarch:  noarch
 
 BuildRequires:   python26-distribute
 BuildRequires:   python26-babel
@@ -38,9 +39,13 @@ Requires:   python26-distribute
 Requires:   python26-twisted
 Requires:   python26-wokkel
 
-Requires(pre): rpm-helper
+Requires(pre): shadow-utils
+Requires(post): chkconfig
+Requires(preun): chkconfig
+# This is for /sbin/service
+Requires(preun): initscripts
+Requires(postun): initscripts
 
-Buildarch:  noarch
 
 
 %description
@@ -67,17 +72,21 @@ make install_files \
 
 %pre
 getent group vigilo-metro >/dev/null || groupadd -r vigilo-metro
-getent passwd vigilo-metro >/dev/null || useradd -r -g vigilo-metro -d %{_localstatedir}/lib/vigilo/rrd -s /sbin/false vigilo-metro
+getent passwd vigilo-metro >/dev/null || useradd -r -g vigilo-metro -d %{_localstatedir}/lib/vigilo/rrd -s /sbin/nologin vigilo-metro
 exit 0
 
 %post
 /sbin/chkconfig --add %{name} || :
-/sbin/service %{name} condrestart > /dev/null 2>&1 || :
 
 %preun
 if [ $1 = 0 ]; then
 	/sbin/service %{name} stop > /dev/null 2>&1 || :
 	/sbin/chkconfig --del %{name} || :
+fi
+
+%postun
+if [ "$1" -ge "1" ] ; then
+	/sbin/service %{name} condrestart > /dev/null 2>&1 || :
 fi
 
 
