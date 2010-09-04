@@ -1,7 +1,4 @@
 NAME := connector-metro
-
-include buildenv/Makefile.common
-
 USER := vigilo-metro
 
 all: build settings.ini
