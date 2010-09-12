@@ -135,8 +135,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type cmd: C{str}
         @param filename: le nom du fichier RRD.
         @type filename: C{str}
-        @param cmd: les arguments pour la commande envoyée à RRDtool
-        @type cmd: C{str}
+        @param args: les arguments pour la commande envoyée à RRDtool
+        @type args: C{str}
         """
         self.startRRDtoolIfNeeded()
         self._rrdtool.stdin.write("%s %s %s\n"%(cmd, filename, args))
