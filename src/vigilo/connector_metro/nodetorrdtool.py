@@ -165,7 +165,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             clés suivantes:
              - C{host}: nom d'hôte
              - C{datasource}: nom de l'indicateur, qui doit être encodé avec
-               urllib.quote (RFC 1738).
+               urllib.quote_plus (RFC 1738).
              - C{timestamp}: timestamp UNIX de la mise à jour
         @type perf: C{dict}
         @param dry_run: Indique que les actions ne doivent pas réellement
