@@ -13,6 +13,7 @@ install: install_files install_permissions
 
 install_files: settings.ini
 	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR) --record=INSTALLED_FILES
+	chmod a+rX -R $(DESTDIR)$(PREFIX)/lib*/python*/*
 	# init
 	install -p -m 755 -D pkg/init.$(DISTRO) $(DESTDIR)/etc/rc.d/init.d/$(PKGNAME)
 	echo /etc/rc.d/init.d/$(PKGNAME) >> INSTALLED_FILES
