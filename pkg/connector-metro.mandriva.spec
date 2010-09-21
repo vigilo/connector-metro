@@ -7,7 +7,7 @@ Name:       %{name}
 Summary:    Vigilo Metrology connector
 Version:    %{version}
 Release:    %{release}
-Source0:    %{module}.tar.bz2
+Source0:    %{name}-%{version}.tar.gz
 URL:        http://www.projet-vigilo.org
 Group:      System/Servers
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
@@ -43,7 +43,7 @@ Gateway from the Vigilo message bus (XMPP) to RRD files.
 This application is part of the Vigilo Project <http://vigilo-project.org>
 
 %prep
-%setup -q -n %{module}
+%setup -q
 
 %build
 make PYTHON=%{_bindir}/python
