@@ -11,7 +11,7 @@ settings.ini: settings.ini.in
 
 install: install_files install_permissions
 
-install_files: settings.ini
+install_files: settings.ini $(PYTHON)
 	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR) --record=INSTALLED_FILES
 	chmod a+rX -R $(DESTDIR)$(PREFIX)/lib*/python*/*
 	# init
