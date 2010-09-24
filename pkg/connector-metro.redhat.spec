@@ -100,7 +100,7 @@ rm -rf $RPM_BUILD_ROOT
 %attr(744,root,root) %{_initrddir}/%{name}
 %dir %{_sysconfdir}/vigilo/
 %dir %{_sysconfdir}/vigilo/%{module}
-%config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
+%attr(640,root,vigilo-metro) %config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
 %{_sysconfdir}/vigilo/%{module}/*.example
 %config(noreplace) %{_sysconfdir}/sysconfig/*
 %{python26_sitelib}/*

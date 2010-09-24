@@ -19,7 +19,7 @@ class ConnectorServiceMaker(object):
     #implements(service.IServiceMaker, IPlugin)
 
     def makeService(self):
-        """ the service that wraps everything the connector needs. """ 
+        """ the service that wraps everything the connector needs. """
         from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
         from vigilo.pubsub.checknode import VerificationNode
         from vigilo.common.conf import settings
@@ -27,6 +27,11 @@ class ConnectorServiceMaker(object):
         from vigilo.common.logging import get_logger
         import os
         LOGGER = get_logger(__name__)
+
+        # On envoie les logs de Twisted vers Python
+        from twisted.python.log import PythonLoggingObserver
+        log = PythonLoggingObserver()
+        log.start()
 
         try:
             conf_ = settings['connector-metro']['config']
@@ -62,7 +67,7 @@ class ConnectorServiceMaker(object):
         except KeyError:
             list_nodeSubscriber = []
 
-        verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber, 
+        verifyNode = VerificationNode(list_nodeOwner, list_nodeSubscriber,
                                       doThings=True)
         verifyNode.setHandlerParent(xmpp_client)
 
