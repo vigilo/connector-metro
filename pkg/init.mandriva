@@ -43,9 +43,9 @@ start() {
     su -s /bin/bash - $USER -c "$DAEMON --pidfile $PID_FILE --syslog $OPTIONS >/dev/null 2>&1"
     RETVAL=$?
     if [ $RETVAL -eq 0 ]; then
-        # Wait 3s to make sure it started properly
+        # Wait 15s to make sure it started properly (it can take a long time to create pubsub node)
         i=0
-        while [ $i -lt 3 ]; do
+        while [ $i -lt 15 ]; do
             if [ ! -f "$PID_FILE" ]; then
                 RETVAL=1
                 failure
