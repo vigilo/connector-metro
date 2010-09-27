@@ -28,11 +28,6 @@ class ConnectorServiceMaker(object):
         import os
         LOGGER = get_logger(__name__)
 
-        # On envoie les logs de Twisted vers Python
-        from twisted.python.log import PythonLoggingObserver
-        log = PythonLoggingObserver()
-        log.start()
-
         try:
             conf_ = settings['connector-metro']['config']
         except KeyError:
