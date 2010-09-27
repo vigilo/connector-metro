@@ -11,7 +11,7 @@ rrd_bin = /usr/bin/rrdtool
 
 [bus]
 # Le trafic lié au bus XMPP doit-il être enregistré dans les logs ?
-log_traffic = True
+log_traffic = False
 
 # Nom ou adresse IP du serveur XMPP à utiliser.
 host = localhost
