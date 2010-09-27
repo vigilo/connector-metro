@@ -46,7 +46,7 @@ start() {
         # Wait 3s to make sure it started properly
         i=0
         while [ $i -lt 3 ]; do
-            if [ ! -f "$PID_FILE" ]; then
+            if ! pgrep -f $DAEMON >/dev/null; then
                 RETVAL=1
                 break
             fi
