@@ -26,18 +26,6 @@ BuildRequires:   python26-babel
 Requires:   python26-distribute
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
-######### Dependance from python dependance tree ########
-Requires:   vigilo-pubsub
-Requires:   vigilo-connector
-Requires:   vigilo-common
-Requires:   python26-twisted
-Requires:   python26-wokkel
-Requires:   python26-configobj
-Requires:   python26-babel
-Requires:   python26-zope-interface
-Requires:   python26-distribute
-Requires:   python26-twisted
-Requires:   python26-wokkel
 
 Requires(pre): shadow-utils
 Requires(post): chkconfig
