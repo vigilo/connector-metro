@@ -1,9 +1,10 @@
 #! /bin/sh
 #
-# vigilo-connector-metro       Init script for the Vigilo-Nagios connector
+# vigilo-connector-metro       Init script for the Vigilo-metrology connector
 #
 #
-
+# chkconfig: 345 95 05
+# description: Starts and stops the Vigilo-metrology connector
 ### BEGIN INIT INFO
 # Provides: vigilo-connector-metro
 # Required-Start: $network $syslog
