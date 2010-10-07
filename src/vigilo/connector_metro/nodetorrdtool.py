@@ -34,7 +34,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
     def __init__(self, fileconf):
         """
-        Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des 
+        Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
 
         @param fileconf: le nom du fichier contenant la définition des hôtes
@@ -49,10 +49,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
         self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
         signal.signal(signal.SIGHUP, self._sighup_handler)
 
-        self._fileconf = fileconf
-        self._rrd_base_dir = settings['connector-metro']['rrd_base_dir']
+        self.fileconf = fileconf
+        self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         self._rrdtool = None
-        self._rrdbin = settings['connector-metro']['rrd_bin']
+        self.rrdbin = settings['connector-metro']['rrd_bin']
+        self.catch_all = settings['connector-metro'].as_bool("catch_all")
 
         # Provoque le chargement de la configuration
         # issues de VigiConf.
@@ -60,7 +61,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
 
         self.startRRDtoolIfNeeded()
 
-    
+
     def connectionInitialized(self):
         """
         Cette méthode est appelée lorsque la connexion est initialisée,
@@ -86,10 +87,10 @@ class NodeToRRDtoolForwarder(PubSubClient):
         Lance une instance de RRDtool dans un sous-processus
         afin de traiter les commandes.
         """
-        if not os.access(self._rrd_base_dir, os.F_OK):
+        if not os.access(self.rrd_base_dir, os.F_OK):
             try:
-                os.makedirs(self._rrd_base_dir)
-                os.chmod(self._rrd_base_dir, # chmod 755
+                os.makedirs(self.rrd_base_dir)
+                os.chmod(self.rrd_base_dir, # chmod 755
                          stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR |\
                          stat.S_IRGRP | stat.S_IXGRP | \
                          stat.S_IROTH | stat.S_IXOTH)
@@ -97,15 +98,15 @@ class NodeToRRDtoolForwarder(PubSubClient):
                 raise OSError(_("Unable to create directory '%(dir)s'") % {
                                 'dir': e.filename,
                             })
-        if not os.access(self._rrd_base_dir, os.W_OK):
+        if not os.access(self.rrd_base_dir, os.W_OK):
             raise OSError(_("Unable to write in the "
                             "directory '%(dir)s'") % {
-                                'dir': self._rrd_base_dir,
+                                'dir': self.rrd_base_dir,
                             })
 
         if self._rrdtool is None:
             try:
-                self._rrdtool = Popen([self._rrdbin, "-"], stdin=PIPE, stdout=PIPE)
+                self._rrdtool = Popen([self.rrdbin, "-"], stdin=PIPE, stdout=PIPE)
                 LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d"), {
                                     'pid': self._rrdtool.pid,
                             })
@@ -114,7 +115,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
                     raise OSError(_('Unable to start "%(rrdtool)s". Make sure '
                                     'RRDtool is installed and you have '
                                     'permissions to use it.') % {
-                                        'rrdtool': self._rrdbin,
+                                        'rrdtool': self.rrdbin,
                                     })
         else:
             r = self._rrdtool.poll()
@@ -175,7 +176,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
         # the creation and updating time needs to be different.
-        timestamp = int(perf["timestamp"]) - 10 
+        timestamp = int(perf["timestamp"]) - 10
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
             try:
@@ -195,7 +196,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
                             "in the configuration file (%(fileconf)s) !"), {
                                 'host': host, 'ds': ds,
-                                'fileconf': self._fileconf,
+                                'fileconf': self.fileconf,
                         })
             raise NodeToRRDtoolForwarderError()
 
@@ -217,6 +218,13 @@ class NodeToRRDtoolForwarder(PubSubClient):
                  stat.S_IRGRP | stat.S_IROTH )
         if dry_run:
             os.remove(filename)
+
+    def filter_host(self, host):
+        """
+        Verifie qu'on doit bien se charger de la métrologie pour l'hôte
+        indiqué dans le message reçu.
+        """
+        return host in self.hosts
 
     def messageForward(self, msg):
         """
@@ -241,9 +249,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
                                 })
                 return
 
+        if not self.filter_host(perf["host"]):
+            LOGGER.debug("Skipping perf update for host %s" % perf["host"])
+            return
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = os.path.join(self._rrd_base_dir, perf["host"],
+        filename = os.path.join(self.rrd_base_dir, perf["host"],
                                 "%s.rrd" % perf["datasource"])
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
@@ -266,7 +277,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
     def chatReceived(self, msg):
         """
         Fonction de traitement des messages de discussion reçus.
-        
+
         @param msg: Message à traiter.
         @type  msg: C{twisted.words.xish.domish.Element}
 
@@ -286,7 +297,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
     def itemsReceived(self, event):
         """
         Fonction de traitement des événements XMPP reçus.
-        
+
         @param event: Événement XMPP à traiter.
         @type  event: C{twisted.words.xish.domish.Element}
 
@@ -295,7 +306,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             # Item is a domish.IElement and a domish.Element
             # Serialize as XML before queueing,
             # or we get harmless stderr pollution  × 5 lines:
-            # Exception RuntimeError: 'maximum recursion depth exceeded in 
+            # Exception RuntimeError: 'maximum recursion depth exceeded in
             # __subclasscheck__' in <type 'exceptions.AttributeError'> ignored
             # Stderr pollution caused by http://bugs.python.org/issue5508
             # and some touchiness on domish attribute access.
@@ -324,7 +335,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             LOGGER.info(_("Received signal to reload the configuration file"))
 
         try:
-            vigiconf_settings.load_configuration(self._fileconf)
+            vigiconf_settings.load_configuration(self.fileconf)
         except IOError, e:
             LOGGER.exception(_("Got exception"))
             raise e
