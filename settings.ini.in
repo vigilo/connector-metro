@@ -8,10 +8,6 @@ rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd
 # Le chemin vers l'exécutable "rrdtool"
 rrd_bin = /usr/bin/rrdtool
 
-# Doit-on stocker toutes les données de perf, ou seulement celles des
-# équipements affectés ?
-catch_all = False
-
 
 [bus]
 # Le trafic lié au bus XMPP doit-il être enregistré dans les logs ?

@@ -4,8 +4,9 @@
 
 import os
 import tempfile
+import unittest
 
-from twisted.trial import unittest
+#from twisted.trial import unittest
 from twisted.internet import reactor
 from twisted.words.xish import domish
 
@@ -44,6 +45,7 @@ class TestNodeToRRDtoolForwarder(unittest.TestCase):
         conf = open(self.confpath, "w")
         conf.write("HOSTS = {'dummy': {}} \n")
         conf.close()
+        self.ntrf._sighup_handler(None, None)
         self.assertEquals(self.ntrf.filter_host("dummy"), True)
 
     def test_nonExistingHost(self):
@@ -54,8 +56,4 @@ class TestNodeToRRDtoolForwarder(unittest.TestCase):
                "value": "dummy_value",}
         self.assertRaises(NodeToRRDtoolForwarderError, self.ntrf.createRRD,
                           "/tmp/nonexistant", msg)
-
-    def test_catch_all(self):
-        self.ntrf.catch_all = True
-        self.assertEquals(self.ntrf.filter_host("dummy"), True)
 

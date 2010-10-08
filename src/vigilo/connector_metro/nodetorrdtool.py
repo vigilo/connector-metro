@@ -53,7 +53,6 @@ class NodeToRRDtoolForwarder(PubSubClient):
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         self._rrdtool = None
         self.rrdbin = settings['connector-metro']['rrd_bin']
-        self.catch_all = settings['connector-metro'].as_bool("catch_all")
 
         # Provoque le chargement de la configuration
         # issues de VigiConf.
