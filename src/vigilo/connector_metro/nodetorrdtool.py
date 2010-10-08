@@ -218,13 +218,6 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if dry_run:
             os.remove(filename)
 
-    def filter_host(self, host):
-        """
-        Verifie qu'on doit bien se charger de la métrologie pour l'hôte
-        indiqué dans le message reçu.
-        """
-        return host in self.hosts
-
     def messageForward(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
@@ -248,7 +241,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
                                 })
                 return
 
-        if not self.filter_host(perf["host"]):
+        if perf["host"] not in self.hosts:
             LOGGER.debug("Skipping perf update for host %s" % perf["host"])
             return
 
