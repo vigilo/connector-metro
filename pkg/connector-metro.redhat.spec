@@ -26,7 +26,6 @@ BuildRequires:   python26-babel
 Requires:   python26-distribute
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
-Requires:   vigilo-nagios-plugins-rrd
 
 Requires(pre): shadow-utils
 Requires(post): chkconfig
