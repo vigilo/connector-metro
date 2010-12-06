@@ -8,6 +8,7 @@ import os
 import stat
 import errno
 import signal
+import urllib
 
 from twisted.words.protocols.jabber import xmlstream
 from wokkel import xmppim
@@ -139,7 +140,9 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type args: C{str}
         """
         self.startRRDtoolIfNeeded()
-        self._rrdtool.stdin.write("%s %s %s\n"%(cmd, filename, args))
+        complete_cmd = "%s %s %s" % (cmd, filename, args)
+        LOGGER.debug(_('Running this command: %s'), complete_cmd)
+        self._rrdtool.stdin.write("%s\n" % complete_cmd)
         self._rrdtool.stdin.flush()
         res = self._rrdtool.stdout.readline()
         lines = res
@@ -155,22 +158,19 @@ class NodeToRRDtoolForwarder(PubSubClient):
                                 'msg': lines.strip(),
                             })
 
-    def createRRD(self, filename, perf, dry_run=False):
+    def createRRD(self, filename, perf):
         """
         Crée un nouveau fichier RRD avec la configuration adéquate.
 
-        @param filename: Nom du fichier RRD à générer.
+        @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
+            doit être encodé avec urllib.quote_plus (RFC 1738).
         @type filename: C{str}
         @param perf: Dictionnaire décrivant la source de données, contenant les
-            clés suivantes:
-             - C{host}: nom d'hôte
-             - C{datasource}: nom de l'indicateur, qui doit être encodé avec
-               urllib.quote_plus (RFC 1738).
-             - C{timestamp}: timestamp UNIX de la mise à jour
+            clés suivantes :
+             - C{host}: Nom de l'hôte.
+             - C{datasource}: Nom de l'indicateur.
+             - C{timestamp}: Timestamp UNIX de la mise à jour.
         @type perf: C{dict}
-        @param dry_run: Indique que les actions ne doivent pas réellement
-            être effectuées (mode simulation).
-        @type dry_run: C{bool}
         """
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
@@ -190,11 +190,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
                             })
                 raise e
         host = perf["host"]
-        ds = perf["datasource"]
+        ds = urllib.quote_plus(perf["datasource"])
         if host not in self.hosts or ds not in self.hosts[host]:
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
                             "in the configuration file (%(fileconf)s) !"), {
-                                'host': host, 'ds': ds,
+                                'host': host,
+                                'ds': perf["datasource"],
                                 'fileconf': self.fileconf,
                         })
             raise NodeToRRDtoolForwarderError()
@@ -215,8 +216,6 @@ class NodeToRRDtoolForwarder(PubSubClient):
         os.chmod(filename, # chmod 644
                  stat.S_IRUSR | stat.S_IWUSR | \
                  stat.S_IRGRP | stat.S_IROTH )
-        if dry_run:
-            os.remove(filename)
 
     def messageForward(self, msg):
         """
@@ -246,8 +245,8 @@ class NodeToRRDtoolForwarder(PubSubClient):
             return
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = os.path.join(self.rrd_base_dir, perf["host"],
-                                "%s.rrd" % perf["datasource"])
+        ds = urllib.quote_plus(perf['datasource'])
+        filename = os.path.join(self.rrd_base_dir, perf["host"], "%s.rrd" % ds)
         basedir = os.path.dirname(filename)
         if not os.path.exists(basedir):
             try:
@@ -338,4 +337,3 @@ class NodeToRRDtoolForwarder(PubSubClient):
         # L'appel n'est pas propagé lorsqu'on est appelé par __init__.
         if callable(self._prev_sighup_handler) and signum is not None:
             self._prev_sighup_handler(signum, frames)
-

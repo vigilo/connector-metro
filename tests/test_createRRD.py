@@ -34,17 +34,20 @@ class TestCreateRRDFile(unittest.TestCase):
         #self.protocol.xmlstream = self.stub.xmlstream
         #self.protocol.connectionInitialized()
         conf = """# vim: set fileencoding=utf-8 sw=4 ts=4 et :
-from urllib import quote
 # the directory to store RRD file
 RRD_BASE_DIR = '/tmp/rrd.test'
+
 # the path to rrdtool binary
 RRD_BIN = '/usr/bin/rrdtool'
+
 # Init the hashmap (mandatory)
 HOSTS = {}
-# In this setup, we create one RRD per DS, each in a folder named after the host.
+
+# In this setup, we create one RRD per DS,
+# each in a folder named after the host.
 # All the RRDs have the same RRAs.
-# Load for server1.example.com
 HOSTS["server1.example.com"] = {}
+
 HOSTS["server1.example.com"]["Load"] = {
     "step": 300,
     "RRA": [
@@ -57,8 +60,27 @@ HOSTS["server1.example.com"]["Load"] = {
         # on garde ~ deux ans précision 1 jour
         { "type": "AVERAGE", "xff": 0.5, "step": 288, "rows": 797}
     ],
-    "DS": { "name": "DS", "type": "GAUGE", "heartbeat": 600, "min": "U", "max": "U" },
-}"""
+    "DS": {"name": "DS", "type": "GAUGE",
+            "heartbeat": 600, "min": "U", "max": "U"},
+}
+
+# A+B%2FC%5CD.E%25F = A B/C\\D.E%F
+HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
+    "step": 300,
+    "RRA": [
+        # on garde ~ deux jours de donnée complète (5 minutes de précision)
+        { "type": "AVERAGE", "xff": 0.5, "step": 1, "rows": 600 },
+        # on garde ~ deux semaines précision 30 minutes
+        { "type": "AVERAGE", "xff": 0.5, "step": 6, "rows": 700 },
+        # on garde ~ deux mois précision 2 h
+        { "type": "AVERAGE", "xff": 0.5, "step": 24, "rows": 775 },
+        # on garde ~ deux ans précision 1 jour
+        { "type": "AVERAGE", "xff": 0.5, "step": 288, "rows": 797}
+    ],
+    "DS": {"name": "DS", "type": "GAUGE",
+            "heartbeat": 600, "min": "U", "max": "U"},
+}
+"""
         conf_h, self.confpath = tempfile.mkstemp()
         os.write(conf_h, conf)
         os.close(conf_h)
@@ -78,9 +100,7 @@ HOSTS["server1.example.com"]["Load"] = {
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
-        xml = text2xml(
-                "perf|1165939739|server1.example." +
-                "com|Load|12")
+        xml = text2xml("perf|1165939739|server1.example.com|Load|12")
         self.ntrf.messageForward(xml)
         # on vérifie que le fichier correspondant a bien été créé
         self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
@@ -92,9 +112,7 @@ HOSTS["server1.example.com"]["Load"] = {
         # on vérifie que le fichier n'existe pas encore
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
-        xml = text2xml(
-                "perf|1165939739|unknown.example." +
-                "com|Load|12")
+        xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
         self.ntrf.messageForward(xml)
         # on vérifie que le fichier correspondant n'a pas été créé
         self.assertRaises(OSError, os.stat, rrdfile)
@@ -107,6 +125,19 @@ HOSTS["server1.example.com"]["Load"] = {
                "value": "dummy_value",}
         self.assertRaises(NodeToRRDtoolForwarderError, self.ntrf.createRRD,
                           "/tmp/nonexistant", msg)
+
+    def test_special_chars_in_pds_name(self):
+        """Caractères spéciaux dans le nom de la source de données."""
+        rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
+                               "server1.example.com", "A+B%2FC%5CD.E%25F.rrd")
+        # on vérifie que le fichier n'existe pas encore
+        # (ce qui lève une exception quand on teste le fichier).
+        self.assertRaises(OSError, os.stat, rrdfile)
+        xml = text2xml("perf|1165939739|server1.example.com|A B/C\\D.E%F|42")
+        self.ntrf.messageForward(xml)
+        # on vérifie que le fichier correspondant a bien été créé
+        self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+
 
 
 if __name__ == "__main__":
