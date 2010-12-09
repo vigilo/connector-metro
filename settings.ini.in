@@ -30,15 +30,10 @@ password = connector-metro
 # TLS sera créée lorsque c'est possible.
 require_tls = False
 
-# Liste des noms des topics à surveiller, séparés par des virgules.
+# Liste des noms des topics auxquels le connecteur est abonné,
+# séparés par des virgules.
 # Si la liste est vide, mettre uniquement une virgule.
-watched_topics = /home/localhost/connector-nagios/perf,
-
-# Liste des noms des topics à créer, séparés par des virgules.
-# Si la liste est vide, mettre uniquement une virgule.
-# Pas utilisé par le connecteur de metro.
-owned_topics = ,
-
+subscriptions = /vigilo/perf,
 
 
 [connector]
