@@ -54,6 +54,7 @@ setup(name='vigilo-connector-metro',
         entry_points={
             'console_scripts': [
                 'vigilo-connector-metro = vigilo.connector_metro.main:main',
+                'vigilo-snmpd-metro = vigilo.connector_metro.snmp:main',
                 ],
             },
         extras_require={
