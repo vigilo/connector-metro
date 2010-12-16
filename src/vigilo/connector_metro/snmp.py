@@ -6,6 +6,12 @@ Inspiré de :
 http://twistedmatrix.com/documents/current/core/examples/stdiodemo.py
 et de http://dreness.com/wikimedia/index.php?title=Net_SNMP
 API à respecter : http://www.net-snmp.org/docs/man/snmpd.conf.html#lbBB
+
+Doit être ajouté dans snmpd.conf par la ligne::
+
+    pass_persist .1.3.6.1.4.1.4242 /usr/bin/python<version> -u /usr/bin/vigilo-snmpd-metro .1.3.6.1.4.1.4242
+
+ATTENTION: le "-u" est *impératif* sinon ça ne marche pas.
 """
 
 import sys
@@ -29,7 +35,7 @@ for h in LOGGER.parent.handlers:
     if not hasattr(h, "stream"):
         continue
     if h.stream.name == "<stdout>":
-        h.close()
+        LOGGER.parent.removeHandler(h)
 
 from vigilo.common.gettext import translate
 _ = translate(__name__)
@@ -137,12 +143,12 @@ class SNMPProtocol(basic.LineReceiver):
         self.sendLine(result)
 
     def write_error(self, error, oid):
-        LOGGER.warning("Error: %s" % error.getErrorMessage())
         if error.check(RRDNoDataError) is not None:
             self.sendLine(oid)
             self.sendLine("string")
             self.sendLine(error.getErrorMessage())
         else:
+            LOGGER.warning("Error: %s" % error.getErrorMessage())
             self.sendLine("NONE")
 
 
