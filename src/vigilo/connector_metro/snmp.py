@@ -159,6 +159,8 @@ class SNMPtoRRDTool(object):
     def __init__(self):
         LOGGER.info(_("SNMP to RRDTool gateway started"))
         self.hosts = {}
+        # Process RRDTool
+        self.rrdtool = RRDToolManager(readonly=True)
         # Vérification des permissions
         self.flight_checks()
         # Lecture de la conf
@@ -168,8 +170,6 @@ class SNMPtoRRDTool(object):
         # Interface SNMP
         self.snmp = SNMPProtocol(self)
         stdio.StandardIO(self.snmp)
-        # Process RRDTool
-        self.rrdtool = RRDToolManager(readonly=True)
 
     def quit(self):
         LOGGER.info(_("SNMP to RRDTool gateway stopped"))
