@@ -126,7 +126,8 @@ class SNMPProtocol(basic.LineReceiver):
 
     def do_get(self, oid):
         LOGGER.debug("Getting OID %s" % oid)
-        if not oid.startswith(SNMP_ENTERPRISE_OID+"."):
+        base_oid = ".1.3.6.1.4.1.%s." % SNMP_ENTERPRISE_OID
+        if not oid.startswith(base_oid):
             LOGGER.warning(_("Received OID outside my base: %s"), oid)
             self.sendLine("NONE")
             return
@@ -226,7 +227,8 @@ class SNMPtoRRDTool(object):
         return d
 
     def oid_to_rrdfile(self, oid):
-        oid = oid[len(SNMP_ENTERPRISE_OID)+1:]
+        base_oid = ".1.3.6.1.4.1.%s." % SNMP_ENTERPRISE_OID
+        oid = oid[len(base_oid):]
         oid = map(int, oid.split("."))
         result = "".join(map(chr, oid))
         if "/" not in result:
