@@ -7,7 +7,8 @@ Created on 14 oct. 2009
 # Teste la creation d'un fichier RRD
 from __future__ import absolute_import
 
-import unittest
+#import unittest
+from twisted.trial import unittest
 import tempfile
 import os
 import stat
@@ -29,6 +30,7 @@ class TestCreateRRDFile(unittest.TestCase):
 
     def setUp(self):
         """Initialisation du test."""
+        #unittest.TestCase.setUp(self)
 
         #self.stub = XmlStreamStub()
         #self.protocol.xmlstream = self.stub.xmlstream
@@ -89,6 +91,7 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
     def tearDown(self):
         """Destruction des objets de test."""
         rmtree(settings['connector-metro']['rrd_base_dir'])
+        self.ntrf.stop()
         os.remove(self.confpath)
 
 
@@ -101,9 +104,12 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
-        self.ntrf.messageForward(xml)
+        d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
-        self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+        def cb(result, rrdfile):
+            self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+        d.addCallback(cb, rrdfile)
+        return d
 
     def test_unhandled_host(self):
         """Le connecteur doit ignorer les hôtes non-déclarés."""
@@ -113,9 +119,12 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
-        self.ntrf.messageForward(xml)
+        d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant n'a pas été créé
-        self.assertRaises(OSError, os.stat, rrdfile)
+        def cb(result, rrdfile):
+            self.assertRaises(OSError, os.stat, rrdfile)
+        d.addCallback(cb, rrdfile)
+        return d
 
     def test_non_existing_host(self):
         """Reception d'un message pour un hôte absent du fichier de conf"""
@@ -134,9 +143,14 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|server1.example.com|A B/C\\D.E%F|42")
-        self.ntrf.messageForward(xml)
+        d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
-        self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+        def cb(result, rrdfile):
+            print "On verifie l'assertion"
+            self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+        d.addCallback(cb, rrdfile)
+        print d
+        return d
 
 
 

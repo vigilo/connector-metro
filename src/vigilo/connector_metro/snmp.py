@@ -9,7 +9,7 @@ API à respecter : http://www.net-snmp.org/docs/man/snmpd.conf.html#lbBB
 
 Doit être ajouté dans snmpd.conf par la ligne::
 
-    pass_persist .1.3.6.1.4.1.4242 /usr/bin/python<version> -u /usr/bin/vigilo-snmpd-metro .1.3.6.1.4.1.4242
+    pass_persist .1.3.6.1.4.1.14132 /usr/bin/python<version> -u /usr/bin/vigilo-snmpd-metro
 
 ATTENTION: le "-u" est *impératif* sinon ça ne marche pas.
 """
@@ -40,7 +40,10 @@ for h in LOGGER.parent.handlers:
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
+from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
+
+SNMP_ENTERPRISE_OID = "14132"
 
 
 class RRDNoDataError(Exception):
@@ -123,8 +126,7 @@ class SNMPProtocol(basic.LineReceiver):
 
     def do_get(self, oid):
         LOGGER.debug("Getting OID %s" % oid)
-        base_oid = settings['connector-metro'].get('base_oid')
-        if not oid.startswith(base_oid+"."):
+        if not oid.startswith(SNMP_ENTERPRISE_OID+"."):
             LOGGER.warning(_("Received OID outside my base: %s"), oid)
             self.sendLine("NONE")
             return
@@ -152,125 +154,53 @@ class SNMPProtocol(basic.LineReceiver):
             self.sendLine("NONE")
 
 
-class RRDToolProcessProtocol(protocol.ProcessProtocol):
-
-    def __init__(self):
-        self.deferred = None
-        self.deferred_start = None
-        self._current_data = []
-        self._keep_alive = True
-
-    def start(self):
-        if self.transport is not None:
-            return defer.succeed(self.transport.pid)
-        LOGGER.debug("Starting rrdtool process in server mode")
-        rrd_bin = settings['connector-metro']['rrd_bin']
-        self.deferred_start = defer.Deferred()
-        reactor.spawnProcess(self, rrd_bin, [rrd_bin, "-"])
-        return self.deferred_start
-
-    def connectionMade(self):
-        if self.deferred_start is not None:
-            self.deferred_start.callback(self.transport.pid)
-
-    def run(self, command, filename, args):
-        self.deferred = defer.Deferred()
-        if isinstance(args, list):
-            args = " ".join(args)
-        complete_cmd = "%s %s %s" % (command, filename, args)
-        LOGGER.debug('Running this command: %s' % complete_cmd)
-        self.transport.write("%s\n" % complete_cmd)
-        return self.deferred
-
-    def outReceived(self, data):
-        self._current_data.append(data)
-        if data.count("\nOK ") == 0 and data.count("\nERROR: ") == 0:
-            return # pas encore fini
-        data = "".join(self._current_data)
-        return self._handle_result(data)
-
-    def errReceived(self, data):
-        return self.outReceived(data)
-
-    def _handle_result(self, data):
-        self._current_data = []
-        if self.deferred is None:
-            LOGGER.warning(_("No deferred available in _handle_result(), "
-                             "this should not happen"))
-            return
-        for line in data.split("\n"):
-            if line.startswith("OK "):
-                self.deferred.callback("\n".join(self._current_data))
-                break
-            elif line.startswith("ERROR: "):
-                self.deferred.errback(line[7:])
-                break
-            self._current_data.append(line)
-        self._current_data = []
-
-    def quit(self):
-        self._keep_alive = False
-        self.transport.write("quit\n")
-        self.transport.loseConnection()
-        #os.kill(self.transport.pid, signal.SIGTERM)
-
-    def processEnded(self, status_object):
-        LOGGER.warning(_('The RRDTool process stopped: %s'), status_object.getErrorMessage())
-        if not self._keep_alive:
-            return
-        # respawn
-        self.start()
-
-
 class SNMPtoRRDTool(object):
 
     def __init__(self):
         LOGGER.info(_("SNMP to RRDTool gateway started"))
-        self._rrdtool = None
         self.hosts = {}
-        self.conf_timestamp = 0
         # Vérification des permissions
         self.flight_checks()
         # Lecture de la conf
+        self.conf_timestamp = 0
         read_conf = task.LoopingCall(self.load_conf)
         read_conf.start(10) # toutes les 10s
         # Interface SNMP
         self.snmp = SNMPProtocol(self)
         stdio.StandardIO(self.snmp)
+        # Process RRDTool
+        self.rrdtool = RRDToolManager(readonly=True)
 
     def quit(self):
         LOGGER.info(_("SNMP to RRDTool gateway stopped"))
-        if self._rrdtool is not None:
-            self._rrdtool.quit()
+        self.rrdtool.stop()
         reactor.stop()
 
     def start(self):
-        d = self.start_rrdtool()
-        return d
+        """
+        Lance une instance de RRDtool dans un sous-processus
+        afin de traiter les commandes.
+        """
+        return self.rrdtool.start()
 
     def load_conf(self):
         conffile = settings['connector-metro']['config']
         current_timestamp = os.stat(conffile).st_mtime
         if current_timestamp <= self.conf_timestamp:
-            return # ça a pas changé
+            return # ça n'a pas changé
         LOGGER.debug("Re-reading configuration file")
         vigiconf_settings.load_configuration(conffile)
         self.hosts = vigiconf_settings['HOSTS']
         self.conf_timestamp = current_timestamp
 
     def flight_checks(self):
-        # configuration
-        try:
-            settings['connector-metro']['base_oid']
-        except KeyError, e:
-            if len(sys.argv) > 1:
-                settings['connector-metro']['base_oid'] = sys.argv[1]
-            else:
-                return self._die(_("ERROR: The 'base_oid' configuration setting is not set"))
         # permissions sur le dossier
         rrd_dir = settings['connector-metro']['rrd_base_dir']
-        if not os.access(rrd_dir, os.F_OK):
-            return self._die(_("ERROR: RRD directory does not exist: %s" % rrd_dir))
+        try:
+            self.rrdtool.ensureDirectory(rrd_dir)
+        except OSError:
+            return self._die(_("ERROR: RRD directory does not exist: %s")
+                             % rrd_dir)
 
     def _die(self, message):
         LOGGER.error(message)
@@ -290,29 +220,19 @@ class SNMPtoRRDTool(object):
             return defer.fail(IOError(_("no such RRD file: %s") % rrd_file))
         step = int(self.hosts[host][ds]["step"])
         duration = step * 3
-        d = self._rrdtool.run("fetch", rrd_file, ["AVERAGE", "--start", "-%s" % duration])
+        args = ["AVERAGE", "--start", "-%s" % duration]
+        d = self.rrdtool.run("fetch", rrd_file, args)
         d.addCallback(self.rrdtool_result, oid, duration)
         return d
 
     def oid_to_rrdfile(self, oid):
-        base_oid = settings['connector-metro'].get('base_oid')
-        oid = oid[len(base_oid)+1:]
+        oid = oid[len(SNMP_ENTERPRISE_OID)+1:]
         oid = map(int, oid.split("."))
         result = "".join(map(chr, oid))
         if "/" not in result:
             raise ValueError(_("this does not look like an RRD file path: %s"
                              % result))
         return "".join(map(chr, oid))
-
-    def start_rrdtool(self):
-        """
-        Lance une instance de RRDtool dans un sous-processus
-        afin de traiter les commandes.
-        """
-        if self._rrdtool is not None:
-            return defer.succeed(self._rrdtool.transport.pid)
-        self._rrdtool = RRDToolProcessProtocol()
-        return self._rrdtool.start()
 
     def rrdtool_result(self, result, oid, duration):
         value = None

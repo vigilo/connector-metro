@@ -8,9 +8,6 @@ rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd
 # Le chemin vers l'exécutable "rrdtool"
 rrd_bin = /usr/bin/rrdtool
 
-# l'OID de base pour pass_persist dans snmpd.conf
-base_oid = .1.3.6.1.4.1.4242
-
 
 [bus]
 # Le trafic lié au bus XMPP doit-il être enregistré dans les logs ?

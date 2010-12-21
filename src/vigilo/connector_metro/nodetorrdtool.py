@@ -10,6 +10,7 @@ import errno
 import signal
 import urllib
 
+from twisted.internet import task, defer
 from twisted.words.protocols.jabber import xmlstream
 from wokkel import xmppim
 from wokkel.pubsub import PubSubClient
@@ -19,6 +20,8 @@ settings.load_module(__name__)
 
 from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
+from vigilo.connector.forwarder import PubSubForwarder
+from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 
 LOGGER = get_logger(__name__)
@@ -27,7 +30,7 @@ _ = translate(__name__)
 
 class NodeToRRDtoolForwarderError(Exception): pass
 
-class NodeToRRDtoolForwarder(PubSubClient):
+class NodeToRRDtoolForwarder(PubSubForwarder):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
@@ -42,24 +45,22 @@ class NodeToRRDtoolForwarder(PubSubClient):
         @type fileconf: C{str}
         """
 
-        super(NodeToRRDtoolForwarder, self).__init__()
+        super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
+        self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
 
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
         self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
         signal.signal(signal.SIGHUP, self._sighup_handler)
-
+        # Configuration
+        self._conf_timestamp = 0
         self.fileconf = fileconf
-        self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
-        self._rrdtool = None
-        self.rrdbin = settings['connector-metro']['rrd_bin']
-
-        # Provoque le chargement de la configuration
-        # issues de VigiConf.
-        self._sighup_handler(None, None)
-
-        self.startRRDtoolIfNeeded()
+        self._read_conf = task.LoopingCall(self.load_conf)
+        self._read_conf.start(10) # toutes les 10s (et maintenant)
+        # Sous-processus
+        self.rrdtool = RRDToolManager()
+        self.rrdtool.start()
 
 
     def connectionInitialized(self):
@@ -68,95 +69,12 @@ class NodeToRRDtoolForwarder(PubSubClient):
         c'est-à-dire lorsque la connexion a réussi et que les échanges
         initiaux (handshakes) sont terminés.
         """
-
-        # Appelé lorsque la connexion est prête (connexion + handshake).
         super(NodeToRRDtoolForwarder, self).connectionInitialized()
-
         # Ajout d'un observateur pour intercepter
         # les messages de chat "one-to-one".
         self.xmlstream.addObserver("/message[@type='chat']", self.chatReceived)
+        self.rrdtool.start()
 
-        # There's probably a way to configure it (on_sub vs on_sub_and_presence)
-        # but the spec defaults to not sending subscriptions without presence.
-        self.send(xmppim.AvailablePresence())
-        LOGGER.info(_('Connection initialized'))
-        self.startRRDtoolIfNeeded()
-
-    def startRRDtoolIfNeeded(self):
-        """
-        Lance une instance de RRDtool dans un sous-processus
-        afin de traiter les commandes.
-        """
-        if not os.access(self.rrd_base_dir, os.F_OK):
-            try:
-                os.makedirs(self.rrd_base_dir)
-                os.chmod(self.rrd_base_dir, # chmod 755
-                         stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR |\
-                         stat.S_IRGRP | stat.S_IXGRP | \
-                         stat.S_IROTH | stat.S_IXOTH)
-            except OSError, e:
-                raise OSError(_("Unable to create directory '%(dir)s'") % {
-                                'dir': e.filename,
-                            })
-        if not os.access(self.rrd_base_dir, os.W_OK):
-            raise OSError(_("Unable to write in the "
-                            "directory '%(dir)s'") % {
-                                'dir': self.rrd_base_dir,
-                            })
-
-        if self._rrdtool is None:
-            try:
-                self._rrdtool = Popen([self.rrdbin, "-"], stdin=PIPE, stdout=PIPE)
-                LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d"), {
-                                    'pid': self._rrdtool.pid,
-                            })
-            except OSError, e:
-                if e.errno == errno.ENOENT:
-                    raise OSError(_('Unable to start "%(rrdtool)s". Make sure '
-                                    'RRDtool is installed and you have '
-                                    'permissions to use it.') % {
-                                        'rrdtool': self.rrdbin,
-                                    })
-        else:
-            r = self._rrdtool.poll()
-            if r != None:
-                LOGGER.info(_("RRDtool seemed to exit with return code "
-                              "%(returncode)d, restarting it..."), {
-                                'returncode': r,
-                            })
-                # Force la création d'un nouveau processus
-                # pour remplacer celui qui vient de mourir.
-                self._rrdtool = None
-                self.startRRDtoolIfNeeded()
-
-    def RRDRun(self, cmd, filename, args):
-        """
-        update an RRD by sending it a command to an rrdtool's instance pipe.
-        @param cmd: la commande envoyée à RRDtool
-        @type cmd: C{str}
-        @param filename: le nom du fichier RRD.
-        @type filename: C{str}
-        @param args: les arguments pour la commande envoyée à RRDtool
-        @type args: C{str}
-        """
-        self.startRRDtoolIfNeeded()
-        complete_cmd = "%s %s %s" % (cmd, filename, args)
-        LOGGER.debug(_('Running this command: %s'), complete_cmd)
-        self._rrdtool.stdin.write("%s\n" % complete_cmd)
-        self._rrdtool.stdin.flush()
-        res = self._rrdtool.stdout.readline()
-        lines = res
-        while not res.startswith("OK ") and not res.startswith("ERROR: "):
-            res = self._rrdtool.stdout.readline()
-            lines += res
-        if not res.startswith("OK"):
-            LOGGER.error(_("RRDtool choked on this command '%(cmd)s' using "
-                            "this file '%(filename)s'. RRDtool replied "
-                            "with: '%(msg)s'"), {
-                                'cmd': cmd,
-                                'filename': filename,
-                                'msg': lines.strip(),
-                            })
 
     def createRRD(self, filename, perf):
         """
@@ -212,12 +130,21 @@ class NodeToRRDtoolForwarder(PubSubClient):
                    (ds_tpl["name"], ds_tpl["type"], ds_tpl["heartbeat"], \
                     ds_tpl["min"], ds_tpl["max"]))
 
-        self.RRDRun("create", filename, " ".join(rrd_cmd))
-        os.chmod(filename, # chmod 644
-                 stat.S_IRUSR | stat.S_IWUSR | \
-                 stat.S_IRGRP | stat.S_IROTH )
+        def chmod_644(result, filename):
+            os.chmod(filename, # chmod 644
+                     stat.S_IRUSR | stat.S_IWUSR | \
+                     stat.S_IRGRP | stat.S_IROTH )
+        def errback(result, filename):
+            LOGGER.error(_("RRDtool could not create the file: "
+                           "%(filename)s. Message: %(msg)s"),
+                         { 'filename': filename,
+                           'msg': result })
+        d = self.rrdtool.run("create", filename, rrd_cmd)
+        d.addCallback(chmod_644, filename)
+        d.addErrback(errback, filename)
 
-    def messageForward(self, msg):
+
+    def forwardMessage(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
 
@@ -227,7 +154,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
         if msg.name != 'perf':
             LOGGER.error(_("'%(msgtype)s' is not a valid message type for "
                            "metrology"), {'msgtype' : msg.name})
-            return
+            return defer.succeed(None)
         perf = {}
         for c in msg.children:
             perf[str(c.name)] = str(c.children[0])
@@ -238,11 +165,11 @@ class NodeToRRDtoolForwarder(PubSubClient):
                                "'%(tag)s' tag)"), {
                                     'tag': i,
                                 })
-                return
+                return defer.succeed(None)
 
         if perf["host"] not in self.hosts:
             LOGGER.debug("Skipping perf update for host %s" % perf["host"])
-            return
+            return defer.succeed(None)
 
         cmd = '%(timestamp)s:%(value)s' % perf
         ds = urllib.quote_plus(perf['datasource'])
@@ -262,8 +189,15 @@ class NodeToRRDtoolForwarder(PubSubClient):
             try:
                 self.createRRD(filename, perf)
             except NodeToRRDtoolForwarderError, e:
-                return # On saute cette mise à jour
-        self.RRDRun('update', filename, cmd)
+                return defer.succeed(None) # On saute cette mise à jour
+        def errback(result, filename):
+            LOGGER.error(_("RRDtool could not update the file: "
+                           "%(filename)s. Message: %(msg)s"),
+                         { 'filename': filename,
+                           'msg': result })
+        d = self.rrdtool.run("update", filename, cmd)
+        d.addErrback(errback, filename)
+        return d
 
     def chatReceived(self, msg):
         """
@@ -282,7 +216,7 @@ class NodeToRRDtoolForwarder(PubSubClient):
             for data in b.elements():
                 LOGGER.debug(_('Chat message to forward: %s'),
                                data.toXml().encode('utf8'))
-                self.messageForward(data)
+                self.forwardMessage(data)
 
 
     def itemsReceived(self, event):
@@ -308,32 +242,44 @@ class NodeToRRDtoolForwarder(PubSubClient):
                 continue
             it = [ it for it in item.elements() if item.name == "item" ]
             for i in it:
-                self.messageForward(i)
+                self.forwardMessage(i)
 
-    def _sighup_handler(self, signum, frames):
+    def load_conf(self):
         """
         Provoque un rechargement de la configuration Python
         issue de VigiConf pour le connecteur de métrologie.
-
-        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
-        @type signum: C{int} ou C{None}
-        @param frames: Frames d'exécution interrompues par le signal.
-        @type frames: C{list}
         """
-
-        # Si signum vaut None, alors on a été appelé depuis __init__.
-        if signum is not None:
-            LOGGER.info(_("Received signal to reload the configuration file"))
-
+        current_timestamp = os.stat(self.fileconf).st_mtime
+        if current_timestamp <= self._conf_timestamp:
+            return # ça n'a pas changé
+        LOGGER.debug("Re-reading configuration file")
         try:
             vigiconf_settings.load_configuration(self.fileconf)
         except IOError, e:
             LOGGER.exception(_("Got exception"))
             raise e
         self.hosts = vigiconf_settings['HOSTS']
+        self._conf_timestamp = current_timestamp
 
+    def _sighup_handler(self, signum, frames):
+        """
+        Gestionnaire du signal SIGHUP: recharge la conf.
+
+        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
+        @type signum: C{int} ou C{None}
+        @param frames: Frames d'exécution interrompues par le signal.
+        @type frames: C{list}
+        """
+        LOGGER.info(_("Received signal to reload the configuration file"))
+        self.load_conf()
         # On appelle le précédent handler s'il y en a un.
         # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
-        # L'appel n'est pas propagé lorsqu'on est appelé par __init__.
-        if callable(self._prev_sighup_handler) and signum is not None:
+        if callable(self._prev_sighup_handler):
             self._prev_sighup_handler(signum, frames)
+
+    def stop(self):
+        """
+        Utilisée par les tests
+        """
+        self._read_conf.stop()
+        self.rrdtool.stop()
