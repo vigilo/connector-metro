@@ -6,16 +6,11 @@ Gestion d'un process RRDTool pour écrire ou lire des RRDs.
 @note: U{http://twistedmatrix.com/documents/current/core/howto/process.html}
 """
 
-import sys
 import os
 import stat
-import inspect
-import warnings
 
-from twisted.internet import stdio, reactor, protocol, defer, task
+from twisted.internet import reactor, protocol, defer
 from twisted.internet.error import ProcessDone, ProcessTerminated
-from twisted.protocols import basic
-from twisted.python.failure import Failure
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
@@ -26,7 +21,13 @@ LOGGER = get_logger(__name__, silent_load=True)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
+
+class NoAvailableProcess(Exception):
+    """
+    Il n'y a plus de process rrdtool disponible, et pourtant le sémaphore a
+    autorisé l'accès
+    """
+    pass
 
 
 class RRDToolManager(object):
@@ -37,8 +38,18 @@ class RRDToolManager(object):
 
     def __init__(self, readonly=False):
         self.readonly = readonly
+        self.job_count = 0
+        # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
+        pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        self.pool = []
+        self._lock = defer.DeferredSemaphore(pool_size)
+        self.buildPool(pool_size)
+        self.work_queue = []
+
+    def buildPool(self, pool_size):
         rrd_bin = settings['connector-metro']['rrd_bin']
-        self._rrdtool = RRDToolProcessProtocol(rrd_bin)
+        for i in range(pool_size):
+            self.pool.append(RRDToolProcessProtocol(rrd_bin))
 
     def start(self):
         """
@@ -50,12 +61,14 @@ class RRDToolManager(object):
         except OSError, e:
             return defer.fail(e)
 
-        if self._rrdtool.transport is not None:
-            return defer.succeed(self._rrdtool.transport.pid)
-        return self._rrdtool.start()
+        results = []
+        for rrdtool in self.pool:
+            results.append(rrdtool.start())
+        return defer.DeferredList(results)
 
     def stop(self):
-        self._rrdtool.quit()
+        for rrdtool in self.pool:
+            rrdtool.quit()
 
     def checkBinary(self):
         rrd_bin = settings['connector-metro']['rrd_bin']
@@ -76,7 +89,8 @@ class RRDToolManager(object):
         """
         if not os.access(directory, os.F_OK):
             if self.readonly:
-                raise OSError(_("The RRD directory does not exist: %s" % directory))
+                raise OSError(_("The RRD directory does not exist: %s"),
+                              directory)
             try:
                 os.makedirs(directory)
                 os.chmod(directory, # chmod 755
@@ -105,7 +119,20 @@ class RRDToolManager(object):
         @return: le Deferred contenant le résultat ou l'erreur
         @rtype: C{Deferred}
         """
-        return self._rrdtool.run(command, filename, args)
+        return self._lock.run(self._dispatch, command, filename, args)
+
+    def _dispatch(self, command, filename, args):
+        """
+        Distribue les tâches sur les processus RRDtool disponibles
+        """
+        self.job_count += 1
+        for index, rrdtool in enumerate(self.pool):
+            if rrdtool.working:
+                continue
+            LOGGER.debug("Running job %d on process %d",
+                         self.job_count, index+1)
+            return rrdtool.run(command, filename, args)
+        raise NoAvailableProcess()
 
 
 class RRDToolProcessProtocol(protocol.ProcessProtocol):
@@ -116,6 +143,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         self.deferred_start = None
         self._current_data = []
         self._keep_alive = True
+        self.working = False
 
     def start(self):
         if self.transport is not None:
@@ -146,6 +174,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         @return: le Deferred contenant le résultat ou l'erreur
         @rtype: C{Deferred}
         """
+        self.working = True
         self.deferred = defer.Deferred()
         if isinstance(args, list):
             args = " ".join(args)
@@ -170,6 +199,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             LOGGER.warning(_("No deferred available in _handle_result(), "
                              "this should not happen"))
             return
+        self.working = False
         for line in data.split("\n"):
             if line.startswith("OK "):
                 self.deferred.callback("\n".join(self._current_data))
@@ -188,7 +218,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
 
     def processEnded(self, reason):
         if isinstance(reason.value, ProcessDone):
-            LOGGER.warning(_('The RRDTool process exited normally'))
+            LOGGER.info(_('The RRDTool process exited normally'))
         elif isinstance(reason.value, ProcessTerminated):
             LOGGER.warning(_('The RRDTool process was terminated abnormally '
                              'with exit code %(rcode)d and message: %(msg)s'),

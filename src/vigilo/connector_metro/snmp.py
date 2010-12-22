@@ -21,9 +21,8 @@ import warnings
 
 warnings.filterwarnings('ignore', category=DeprecationWarning,
                         module='^twisted\.')
-from twisted.internet import stdio, reactor, protocol, defer, task
+from twisted.internet import stdio, reactor, defer, task
 from twisted.protocols import basic
-from twisted.python.failure import Failure
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)

@@ -3,17 +3,12 @@
 Ce module fournit un demi-connecteur capable de lire des messages
 depuis un bus XMPP pour les stocker dans une base de données RRDtool.
 """
-from subprocess import Popen, PIPE
 import os
 import stat
-import errno
 import signal
 import urllib
 
 from twisted.internet import task, defer
-from twisted.words.protocols.jabber import xmlstream
-from wokkel import xmppim
-from wokkel.pubsub import PubSubClient
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
@@ -194,7 +189,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
             LOGGER.error(_("RRDtool could not update the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
-                           'msg': result })
+                           'msg': result.getErrorMessage() })
         d = self.rrdtool.run("update", filename, cmd)
         d.addErrback(errback, filename)
         return d
