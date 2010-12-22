@@ -17,7 +17,7 @@ from shutil import rmtree
 from vigilo.common.conf import settings
 settings.load_module(__name__)
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder, \
-                                                 NodeToRRDtoolForwarderError
+                                                 NotInConfiguration
 from vigilo.connector.converttoxml import text2xml
 
 
@@ -106,10 +106,9 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
         d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
-        def cb(result, rrdfile):
+        def cb(_):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
-        d.addCallback(cb, rrdfile)
-        return d
+        return d.addCallback(cb)
 
     def test_unhandled_host(self):
         """Le connecteur doit ignorer les hôtes non-déclarés."""
@@ -121,10 +120,9 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
         d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant n'a pas été créé
-        def cb(result, rrdfile):
+        def cb(_):
             self.assertRaises(OSError, os.stat, rrdfile)
-        d.addCallback(cb, rrdfile)
-        return d
+        return d.addCallback(cb)
 
     def test_non_existing_host(self):
         """Reception d'un message pour un hôte absent du fichier de conf"""
@@ -132,7 +130,7 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
                "host": "dummy_host",
                "datasource": "dummy_datasource",
                "value": "dummy_value",}
-        self.assertRaises(NodeToRRDtoolForwarderError, self.ntrf.createRRD,
+        self.assertRaises(NotInConfiguration, self.ntrf.createRRD,
                           "/tmp/nonexistant", msg)
 
     def test_special_chars_in_pds_name(self):
@@ -145,12 +143,9 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         xml = text2xml("perf|1165939739|server1.example.com|A B/C\\D.E%F|42")
         d = self.ntrf.forwardMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
-        def cb(result, rrdfile):
-            print "On verifie l'assertion"
+        def cb(_):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
-        d.addCallback(cb, rrdfile)
-        print d
-        return d
+        return d.addCallback(cb)
 
 
 

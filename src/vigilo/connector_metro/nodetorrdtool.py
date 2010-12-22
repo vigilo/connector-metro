@@ -23,7 +23,11 @@ LOGGER = get_logger(__name__)
 _ = translate(__name__)
 
 
-class NodeToRRDtoolForwarderError(Exception): pass
+class NotInConfiguration(KeyError):
+    pass
+
+class InvalidMessage(ValueError):
+    pass
 
 class NodeToRRDtoolForwarder(PubSubForwarder):
     """
@@ -90,18 +94,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         # the creation and updating time needs to be different.
         timestamp = int(perf["timestamp"]) - 10
         basedir = os.path.dirname(filename)
-        if not os.path.exists(basedir):
-            try:
-                os.makedirs(basedir)
-                os.chmod(basedir, # chmod 755
-                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
-                         stat.S_IRGRP | stat.S_IXGRP | \
-                         stat.S_IROTH | stat.S_IXOTH)
-            except OSError, e:
-                LOGGER.error(_("Unable to create the directory '%(dir)s'"), {
-                                'dir': e.filename,
-                            })
-                raise e
+        self._makedirs(basedir)
         host = perf["host"]
         ds = urllib.quote_plus(perf["datasource"])
         if host not in self.hosts or ds not in self.hosts[host]:
@@ -111,7 +104,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
                                 'ds': perf["datasource"],
                                 'fileconf': self.fileconf,
                         })
-            raise NodeToRRDtoolForwarderError()
+            raise NotInConfiguration()
 
         values = self.hosts[host][ds]
         rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
@@ -137,7 +130,41 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         d = self.rrdtool.run("create", filename, rrd_cmd)
         d.addCallback(chmod_644, filename)
         d.addErrback(errback, filename)
+        return d
 
+    def _parse_message(self, msg):
+        if msg.name != 'perf':
+            errormsg = _("'%(msgtype)s' is not a valid message type for "
+                         "metrology")
+            raise InvalidMessage(errormsg % {'msgtype' : msg.name})
+        perf = {}
+        for c in msg.children:
+            perf[str(c.name)] = str(c.children[0])
+
+        for i in 'timestamp', 'value', 'host', 'datasource':
+            if i not in perf:
+                errormsg = _(u"Not a valid performance message (missing "
+                              "'%(tag)s' tag)")
+                raise InvalidMessage(errormsg % {"tag": i})
+
+        if perf["host"] not in self.hosts:
+            raise NotInConfiguration("Skipping perf update for host %s"
+                                     % perf["host"])
+        return perf
+
+    def _makedirs(self, directory):
+        # Création du dossier si besoin
+        if os.path.exists(directory):
+            return
+        try:
+            os.makedirs(directory)
+            os.chmod(directory, # chmod 755
+                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
+                     stat.S_IRGRP | stat.S_IXGRP | \
+                     stat.S_IROTH | stat.S_IXOTH)
+        except OSError, e:
+            LOGGER.error(_("Unable to create the directory '%s'"), directory)
+            raise e
 
     def forwardMessage(self, msg):
         """
@@ -146,53 +173,42 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         @param msg: Message à transmettre
         @type msg: C{twisted.words.test.domish Xml}
         """
-        if msg.name != 'perf':
-            LOGGER.error(_("'%(msgtype)s' is not a valid message type for "
-                           "metrology"), {'msgtype' : msg.name})
+        try:
+            perf = self._parse_message(msg)
+        except InvalidMessage, e:
+            LOGGER.error(str(e))
             return defer.succeed(None)
-        perf = {}
-        for c in msg.children:
-            perf[str(c.name)] = str(c.children[0])
-
-        for i in 'timestamp', 'value', 'host', 'datasource':
-            if i not in perf:
-                LOGGER.error(_(u"Not a valid performance message (missing "
-                               "'%(tag)s' tag)"), {
-                                    'tag': i,
-                                })
-                return defer.succeed(None)
-
-        if perf["host"] not in self.hosts:
-            LOGGER.debug("Skipping perf update for host %s" % perf["host"])
+        except NotInConfiguration, e:
+            LOGGER.debug(str(e))
             return defer.succeed(None)
 
         cmd = '%(timestamp)s:%(value)s' % perf
         ds = urllib.quote_plus(perf['datasource'])
         filename = os.path.join(self.rrd_base_dir, perf["host"], "%s.rrd" % ds)
         basedir = os.path.dirname(filename)
-        if not os.path.exists(basedir):
-            try:
-                os.makedirs(basedir)
-                os.chmod(basedir, # chmod 755
-                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
-                         stat.S_IRGRP | stat.S_IXGRP | \
-                         stat.S_IROTH | stat.S_IXOTH)
-            except OSError, e:
-                LOGGER.error(_("Unable to create the directory '%s'"),
-                    e.filename)
+        self._makedirs(basedir)
+
+        main_d = defer.Deferred()
+        # Création du RRD si besoin
         if not os.path.isfile(filename):
             try:
-                self.createRRD(filename, perf)
-            except NodeToRRDtoolForwarderError, e:
+                create_d = self.createRRD(filename, perf)
+            except NotInConfiguration, e:
                 return defer.succeed(None) # On saute cette mise à jour
+        else:
+            create_d = defer.succeed(None) # Juste pour pouvoir directement lancer la MAJ
+        # MAJ du RRD
+        def update_rrd(result):
+            update_d = self.rrdtool.run("update", filename, cmd)
+            update_d.addErrback(errback, filename)
+            update_d.chainDeferred(main_d)
         def errback(result, filename):
             LOGGER.error(_("RRDtool could not update the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
                            'msg': result.getErrorMessage() })
-        d = self.rrdtool.run("update", filename, cmd)
-        d.addErrback(errback, filename)
-        return d
+        create_d.addCallback(update_rrd)
+        return main_d
 
     def chatReceived(self, msg):
         """
