@@ -45,6 +45,9 @@ from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 SNMP_ENTERPRISE_OID = "14132"
 
 
+class NoSuchRRDFile(IOError):
+    pass
+
 class RRDNoDataError(Exception):
     pass
 
@@ -145,13 +148,15 @@ class SNMPProtocol(basic.LineReceiver):
         self.sendLine(result)
 
     def write_error(self, error, oid):
-        if error.check(RRDNoDataError) is not None:
-            self.sendLine(oid)
-            self.sendLine("string")
-            self.sendLine(error.getErrorMessage())
-        else:
-            LOGGER.warning(error.getErrorMessage())
-            self.sendLine("NONE")
+        known_errors = (RRDNoDataError, NoSuchRRDFile)
+        for errtype in known_errors:
+            if error.check(errtype) is not None:
+                self.sendLine(oid)
+                self.sendLine("string")
+                self.sendLine(error.getErrorMessage())
+                return
+        LOGGER.warning(error.getErrorMessage())
+        self.sendLine("NONE")
 
 
 class SNMPtoRRDTool(object):
@@ -217,7 +222,7 @@ class SNMPtoRRDTool(object):
         rrd_dir = settings['connector-metro']['rrd_base_dir']
         rrd_file = os.path.join(rrd_dir, rrd_file+".rrd")
         if not os.path.exists(rrd_file):
-            return defer.fail(IOError(_("no such RRD file: %s") % rrd_file))
+            return defer.fail(NoSuchRRDFile(_("no such RRD file: %s") % rrd_file))
         step = int(self.hosts[host][ds]["step"])
         duration = step * 3
         args = ["AVERAGE", "--start", "-%s" % duration]
