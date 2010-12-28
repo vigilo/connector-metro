@@ -150,7 +150,7 @@ class SNMPProtocol(basic.LineReceiver):
             self.sendLine("string")
             self.sendLine(error.getErrorMessage())
         else:
-            LOGGER.warning("Error: %s" % error.getErrorMessage())
+            LOGGER.warning(error.getErrorMessage())
             self.sendLine("NONE")
 
 
@@ -199,7 +199,7 @@ class SNMPtoRRDTool(object):
         try:
             self.rrdtool.ensureDirectory(rrd_dir)
         except OSError:
-            return self._die(_("ERROR: RRD directory does not exist: %s")
+            return self._die(_("RRD directory does not exist: %s")
                              % rrd_dir)
 
     def _die(self, message):
