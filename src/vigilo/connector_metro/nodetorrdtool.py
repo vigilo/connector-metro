@@ -7,6 +7,7 @@ import os
 import stat
 import signal
 import urllib
+import hashlib
 
 from twisted.internet import task, defer
 
@@ -46,6 +47,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
 
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
+        self.rrd_path_mode = settings['connector-metro'].get('rrd_path_mode', 'flat')
 
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
@@ -60,6 +62,8 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         # Sous-processus
         self.rrdtool = RRDToolManager()
         self.rrdtool.start()
+        # Cache du hash pour les répertoires
+        self._dir_hashes = {}
 
 
     def connectionInitialized(self):
@@ -96,12 +100,12 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
         host = perf["host"]
-        ds = urllib.quote_plus(perf["datasource"])
+        ds = perf["datasource"]
         if host not in self.hosts or ds not in self.hosts[host]:
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
                             "in the configuration file (%(fileconf)s) !"), {
                                 'host': host,
-                                'ds': perf["datasource"],
+                                'ds': ds,
                                 'fileconf': self.fileconf,
                         })
             raise NotInConfiguration()
@@ -156,15 +160,53 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         # Création du dossier si besoin
         if os.path.exists(directory):
             return
-        try:
-            os.makedirs(directory)
-            os.chmod(directory, # chmod 755
-                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
-                     stat.S_IRGRP | stat.S_IXGRP | \
-                     stat.S_IROTH | stat.S_IXOTH)
-        except OSError, e:
-            LOGGER.error(_("Unable to create the directory '%s'"), directory)
-            raise e
+        if not directory.startswith(self.rrd_base_dir):
+            raise ValueError("Directory %s is not in the RRD directory"
+                             % directory)
+        tocreate = directory[len(self.rrd_base_dir)+1:]
+        cur_dir = self.rrd_base_dir
+        for subdir in tocreate.split(os.sep):
+            cur_dir = os.path.join(cur_dir, subdir)
+            if os.path.exists(cur_dir):
+                continue
+            try:
+                os.mkdir(cur_dir) # l'option 'mode' de mkdir respecte l'umask, dommage
+                os.chmod(cur_dir, # chmod 755
+                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
+                         stat.S_IRGRP | stat.S_IXGRP | \
+                         stat.S_IROTH | stat.S_IXOTH)
+            except OSError, e:
+                LOGGER.error(_("Unable to create the directory '%s'"), cur_dir)
+                raise e
+
+    def _get_filename(self, msgdata):
+        hostname = msgdata["host"]
+        ds = urllib.quote_plus(msgdata['datasource'])
+        subpath = ""
+        if self.rrd_path_mode == "name" and len(hostname) >= 2:
+            subpath = os.path.join(hostname[0], "".join(hostname[0:2]))
+        elif self.rrd_path_mode == "hash":
+            if hostname in self._dir_hashes:
+                subpath = self._dir_hashes[hostname]
+            else:
+                hash = hashlib.md5(hostname).hexdigest()
+                subpath = os.path.join(hash[0], "".join(hash[0:2]))
+                self._dir_hashes[hostname] = subpath
+        return os.path.join(self.rrd_base_dir, subpath, hostname, "%s.rrd" % ds)
+
+    def create_if_needed(self, filename, msgdata):
+        """Création du RRD si besoin"""
+        if os.path.isfile(filename):
+            return defer.succeed(None)
+        # compatibilité
+        old_filename = os.path.join(self.rrd_base_dir, msgdata["host"], "%s.rrd"
+                                    % urllib.quote_plus(msgdata["datasource"]))
+        if os.path.isfile(old_filename):
+            os.rename(old_filename, filename)
+            return defer.succeed(None)
+        else:
+            # création
+            return self.createRRD(filename, msgdata)
 
     def forwardMessage(self, msg):
         """
@@ -183,32 +225,26 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
             return defer.succeed(None)
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        ds = urllib.quote_plus(perf['datasource'])
-        filename = os.path.join(self.rrd_base_dir, perf["host"], "%s.rrd" % ds)
+        filename = self._get_filename(perf)
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
 
-        main_d = defer.Deferred()
-        # Création du RRD si besoin
-        if not os.path.isfile(filename):
-            try:
-                create_d = self.createRRD(filename, perf)
-            except NotInConfiguration, e:
-                return defer.succeed(None) # On saute cette mise à jour
-        else:
-            create_d = defer.succeed(None) # Juste pour pouvoir directement lancer la MAJ
+        try:
+            create_d = self.create_if_needed(filename, perf)
+        except NotInConfiguration:
+            return defer.succeed(None) # On saute cette mise à jour
         # MAJ du RRD
         def update_rrd(result):
             update_d = self.rrdtool.run("update", filename, cmd)
             update_d.addErrback(errback, filename)
-            update_d.chainDeferred(main_d)
+            return update_d # chaînage
         def errback(result, filename):
             LOGGER.error(_("RRDtool could not update the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
                            'msg': result.getErrorMessage() })
         create_d.addCallback(update_rrd)
-        return main_d
+        return create_d
 
     def chatReceived(self, msg):
         """

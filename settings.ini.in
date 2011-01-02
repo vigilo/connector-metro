@@ -5,6 +5,20 @@ config = @SYSCONFDIR@/vigilo/connector-metro/connector-metro.conf.py
 # Le dossier où seront stockés les fichiers RRD
 rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd
 
+# Cette option permet de configurer l'arborescence des dossiers dans lesquels
+# seront stockés les RRD. Les valeurs suivantes sont possibles :
+# - flat : le dossier au nom de l'hôte sera placé à la racine de rrd_base
+# (ci-dessus). Convient pour un faible nombre d'hôtes.
+# - name : une arborescence sera créée en utilisant les deux premiers
+# caractères du nom de l'hôte. Convient pour des installations de grande
+# taille dans lesquelles les hôtes ont des noms dont les deux premiers
+# caractères diffèrent.
+# - hash : une arborescence sera créé en utilisant les deux premiers caractères
+# du hash MD5 du nom de l'hôte. Convient pour des installations de grande
+# taille dont les hôtes ont des noms avec un préfixe commun.
+# Cette option doit être réglée à l'identique de celle de VigiRRD
+rrd_path_mode = name
+
 # Le chemin vers l'exécutable "rrdtool"
 rrd_bin = /usr/bin/rrdtool
 
