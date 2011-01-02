@@ -66,8 +66,8 @@ HOSTS["server1.example.com"]["Load"] = {
             "heartbeat": 600, "min": "U", "max": "U"},
 }
 
-# A+B%2FC%5CD.E%25F = A B/C\\D.E%F
-HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
+# A B/C\\D.E%F => A+B%2FC%5CD.E%25F
+HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
     "step": 300,
     "RRA": [
         # on garde ~ deux jours de donnée complète (5 minutes de précision)
@@ -145,7 +145,8 @@ HOSTS["server1.example.com"]["A+B%2FC%5CD.E%25F"] = {
         # on vérifie que le fichier correspondant a bien été créé
         def cb(_):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
-        return d.addCallback(cb)
+        d.addCallback(cb)
+        return d
 
 
 
