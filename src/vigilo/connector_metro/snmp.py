@@ -215,10 +215,11 @@ class SNMPtoRRDTool(object):
 
     def get(self, oid):
         try:
-            rrd_file = self.oid_to_rrdfile(oid)
+            rrd_spec = self.oid_to_rrdfile(oid).split("/")
         except ValueError, e:
             return defer.fail(e)
-        host, ds = rrd_file.split("/")
+        host = rrd_spec[0]
+        ds = "/".join(rrd_spec[1:])
         LOGGER.debug("getting last value for host %s and ds %s" % (host, ds))
         rrd_file = get_rrd_path(host, ds)
         if not os.path.exists(rrd_file):
