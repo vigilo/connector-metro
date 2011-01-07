@@ -39,6 +39,7 @@ for h in LOGGER.parent.handlers:
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
+from vigilo.connector_metro import get_rrd_path
 from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 
@@ -219,8 +220,7 @@ class SNMPtoRRDTool(object):
             return defer.fail(e)
         host, ds = rrd_file.split("/")
         LOGGER.debug("getting last value for host %s and ds %s" % (host, ds))
-        rrd_dir = settings['connector-metro']['rrd_base_dir']
-        rrd_file = os.path.join(rrd_dir, rrd_file+".rrd")
+        rrd_file = get_rrd_path(host, ds)
         if not os.path.exists(rrd_file):
             return defer.fail(NoSuchRRDFile(_("no such RRD file: %s") % rrd_file))
         step = int(self.hosts[host][ds]["step"])

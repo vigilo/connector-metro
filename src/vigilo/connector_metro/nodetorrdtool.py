@@ -7,7 +7,6 @@ import os
 import stat
 import signal
 import urllib
-import hashlib
 
 from twisted.internet import task, defer
 
@@ -17,6 +16,7 @@ settings.load_module(__name__)
 from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
 from vigilo.connector.forwarder import PubSubForwarder
+from vigilo.connector_metro import get_rrd_path
 from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 
@@ -47,8 +47,6 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
 
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
-        self.rrd_path_mode = settings['connector-metro'].get('rrd_path_mode', 'flat')
-
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
@@ -62,9 +60,6 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         # Sous-processus
         self.rrdtool = RRDToolManager()
         self.rrdtool.start()
-        # Cache du hash pour les répertoires
-        self._dir_hashes = {}
-
 
     def connectionInitialized(self):
         """
@@ -179,21 +174,6 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
                 LOGGER.error(_("Unable to create the directory '%s'"), cur_dir)
                 raise e
 
-    def _get_filename(self, msgdata):
-        hostname = msgdata["host"]
-        ds = urllib.quote_plus(msgdata['datasource'])
-        subpath = ""
-        if self.rrd_path_mode == "name" and len(hostname) >= 2:
-            subpath = os.path.join(hostname[0], "".join(hostname[0:2]))
-        elif self.rrd_path_mode == "hash":
-            if hostname in self._dir_hashes:
-                subpath = self._dir_hashes[hostname]
-            else:
-                hash = hashlib.md5(hostname).hexdigest()
-                subpath = os.path.join(hash[0], "".join(hash[0:2]))
-                self._dir_hashes[hostname] = subpath
-        return os.path.join(self.rrd_base_dir, subpath, hostname, "%s.rrd" % ds)
-
     def create_if_needed(self, filename, msgdata):
         """Création du RRD si besoin"""
         if os.path.isfile(filename):
@@ -225,7 +205,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
             return defer.succeed(None)
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = self._get_filename(perf)
+        filename = get_rrd_path(perf["host"], perf["datasource"])
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
 
