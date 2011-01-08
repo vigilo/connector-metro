@@ -7,12 +7,16 @@ Created on 14 oct. 2009
 # Teste la creation d'un fichier RRD
 from __future__ import absolute_import
 
-#import unittest
-from twisted.trial import unittest
 import tempfile
 import os
 import stat
 from shutil import rmtree
+import unittest
+
+# ATTENTION: ne pas utiliser twisted.trial, car nose va ignorer les erreurs
+# produites par ce module !!!
+#from twisted.trial import unittest
+from nose.twistedtools import reactor, deferred
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
@@ -95,6 +99,7 @@ HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
         os.remove(self.confpath)
 
 
+    @deferred(timeout=5)
     def test_handled_host(self):
         """Prise en compte de messages sur des hôtes déclarés."""
 
@@ -104,12 +109,13 @@ HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
-        d = self.ntrf.forwardMessage(xml)
+        d = self.ntrf.processMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
         def cb(_):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
         return d.addCallback(cb)
 
+    @deferred(timeout=5)
     def test_unhandled_host(self):
         """Le connecteur doit ignorer les hôtes non-déclarés."""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
@@ -118,7 +124,7 @@ HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
-        d = self.ntrf.forwardMessage(xml)
+        d = self.ntrf.processMessage(xml)
         # on vérifie que le fichier correspondant n'a pas été créé
         def cb(_):
             self.assertRaises(OSError, os.stat, rrdfile)
@@ -133,6 +139,7 @@ HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
         self.assertRaises(NotInConfiguration, self.ntrf.createRRD,
                           "/tmp/nonexistant", msg)
 
+    @deferred(timeout=5)
     def test_special_chars_in_pds_name(self):
         """Caractères spéciaux dans le nom de la source de données."""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
@@ -141,7 +148,7 @@ HOSTS["server1.example.com"]["A B/C\\D.E%F"] = {
         # (ce qui lève une exception quand on teste le fichier).
         self.assertRaises(OSError, os.stat, rrdfile)
         xml = text2xml("perf|1165939739|server1.example.com|A B/C\\D.E%F|42")
-        d = self.ntrf.forwardMessage(xml)
+        d = self.ntrf.processMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
         def cb(_):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))

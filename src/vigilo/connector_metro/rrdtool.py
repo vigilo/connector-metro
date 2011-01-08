@@ -39,6 +39,7 @@ class RRDToolManager(object):
     def __init__(self, readonly=False):
         self.readonly = readonly
         self.job_count = 0
+        self.started = False
         # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
         pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
         self.pool = []
@@ -64,11 +65,16 @@ class RRDToolManager(object):
         results = []
         for rrdtool in self.pool:
             results.append(rrdtool.start())
-        return defer.DeferredList(results)
+        d = defer.DeferredList(results)
+        def flag_started(r):
+            self.started = True
+        d.addCallback(flag_started)
+        return d
 
     def stop(self):
         for rrdtool in self.pool:
             rrdtool.quit()
+        self.started = False
 
     def checkBinary(self):
         rrd_bin = settings['connector-metro']['rrd_bin']

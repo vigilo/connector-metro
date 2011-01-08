@@ -15,8 +15,8 @@ settings.load_module(__name__)
 
 from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
-from vigilo.connector.forwarder import PubSubForwarder
-from vigilo.connector_metro import get_rrd_path
+from vigilo.connector.forwarder import PubSubListener
+from vigilo.common import get_rrd_path
 from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
 
@@ -30,7 +30,7 @@ class NotInConfiguration(KeyError):
 class InvalidMessage(ValueError):
     pass
 
-class NodeToRRDtoolForwarder(PubSubForwarder):
+class NodeToRRDtoolForwarder(PubSubListener):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
@@ -59,6 +59,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         self._read_conf.start(10) # toutes les 10s (et maintenant)
         # Sous-processus
         self.rrdtool = RRDToolManager()
+        self.max_send_simult = len(self.rrdtool.pool)
         self.rrdtool.start()
 
     def connectionInitialized(self):
@@ -68,11 +69,7 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         initiaux (handshakes) sont terminés.
         """
         super(NodeToRRDtoolForwarder, self).connectionInitialized()
-        # Ajout d'un observateur pour intercepter
-        # les messages de chat "one-to-one".
-        self.xmlstream.addObserver("/message[@type='chat']", self.chatReceived)
         self.rrdtool.start()
-
 
     def createRRD(self, filename, perf):
         """
@@ -188,10 +185,13 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
             # création
             return self.createRRD(filename, msgdata)
 
-    def forwardMessage(self, msg):
+    def isConnected(self):
+        """Sauf cas exceptionnel, on est toujours connecté"""
+        return self.rrdtool.started
+
+    def processMessage(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
-
         @param msg: Message à transmettre
         @type msg: C{twisted.words.test.domish Xml}
         """
@@ -205,7 +205,10 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
             return defer.succeed(None)
 
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = get_rrd_path(perf["host"], perf["datasource"])
+        rrd_dir = settings['connector-metro']['rrd_base_dir']
+        rrd_path_mode = settings['connector-metro']['rrd_path_mode']
+        filename = get_rrd_path(perf["host"], perf["datasource"],
+                                rrd_dir, rrd_path_mode)
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
 
@@ -225,51 +228,6 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
                            'msg': result.getErrorMessage() })
         create_d.addCallback(update_rrd)
         return create_d
-
-    def chatReceived(self, msg):
-        """
-        Fonction de traitement des messages de discussion reçus.
-
-        @param msg: Message à traiter.
-        @type  msg: C{twisted.words.xish.domish.Element}
-
-        """
-        # Il ne devrait y avoir qu'un seul corps de message (body)
-        bodys = [element for element in msg.elements()
-                         if element.name in ('body',)]
-
-        for b in bodys:
-            # les données dont on a besoin sont juste en dessous
-            for data in b.elements():
-                LOGGER.debug(_('Chat message to forward: %s'),
-                               data.toXml().encode('utf8'))
-                self.forwardMessage(data)
-
-
-    def itemsReceived(self, event):
-        """
-        Fonction de traitement des événements XMPP reçus.
-
-        @param event: Événement XMPP à traiter.
-        @type  event: C{twisted.words.xish.domish.Element}
-
-        """
-        for item in event.items:
-            # Item is a domish.IElement and a domish.Element
-            # Serialize as XML before queueing,
-            # or we get harmless stderr pollution  × 5 lines:
-            # Exception RuntimeError: 'maximum recursion depth exceeded in
-            # __subclasscheck__' in <type 'exceptions.AttributeError'> ignored
-            # Stderr pollution caused by http://bugs.python.org/issue5508
-            # and some touchiness on domish attribute access.
-            if item.name != 'item':
-                # The alternative is 'retract', which we silently ignore
-                # We receive retractations in FIFO order,
-                # ejabberd keeps 10 items before retracting old items.
-                continue
-            it = [ it for it in item.elements() if item.name == "item" ]
-            for i in it:
-                self.forwardMessage(i)
 
     def load_conf(self):
         """
@@ -310,3 +268,4 @@ class NodeToRRDtoolForwarder(PubSubForwarder):
         """
         self._read_conf.stop()
         self.rrdtool.stop()
+
