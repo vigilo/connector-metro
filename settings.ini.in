@@ -17,7 +17,7 @@ rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd
 # du hash MD5 du nom de l'hôte. Convient pour des installations de grande
 # taille dont les hôtes ont des noms avec un préfixe commun.
 # Cette option doit être réglée à l'identique de celle de VigiRRD
-rrd_path_mode = name
+rrd_path_mode = hash
 
 # Le chemin vers l'exécutable "rrdtool"
 rrd_bin = /usr/bin/rrdtool
