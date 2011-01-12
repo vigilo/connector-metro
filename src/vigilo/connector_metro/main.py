@@ -21,6 +21,7 @@ class ConnectorServiceMaker(object):
     def makeService(self):
         """ the service that wraps everything the connector needs. """
         from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
+        from vigilo.connector.status import StatusPublisher
         from vigilo.common.conf import settings
         settings.load_module(__name__)
 
@@ -41,8 +42,14 @@ class ConnectorServiceMaker(object):
         except OSError, e:
             LOGGER.exception(e)
             raise
-
         message_consumer.setHandlerParent(xmpp_client)
+
+        # Statistiques
+        stats_publisher = StatusPublisher(
+                            message_consumer,
+                            settings["connector"].get("hostname", None),
+                            "vigilo-connector-metro")
+        stats_publisher.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
         xmpp_client.setServiceParent(root_service)

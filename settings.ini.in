@@ -61,6 +61,16 @@ backup_table_to_bus = tobus
 backup_table_from_bus = frombus
 
 
+[publications]
+# Noms des messages XML traités avec pour chaque type de message
+# le nom du nœud XMPP sur lesquel les messages de ce type sont envoyés.
+perf = /vigilo/perf
+state = /vigilo/state
+event = /vigilo/event
+command = /vigilo/command
+# Dans le connector-metro, la publication est utilisé pour diffuser les
+# métriques de fonctionnement
+
 
 [loggers]
 keys=root,twisted
