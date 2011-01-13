@@ -201,6 +201,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
             LOGGER.error(str(e))
             return defer.succeed(None)
         except NotInConfiguration, e:
+            self._messages_forwarded -= 1
             LOGGER.debug(str(e))
             return defer.succeed(None)
 
@@ -215,6 +216,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         try:
             create_d = self.create_if_needed(filename, perf)
         except NotInConfiguration:
+            self._messages_forwarded -= 1
             return defer.succeed(None) # On saute cette mise à jour
         # MAJ du RRD
         def update_rrd(result):
