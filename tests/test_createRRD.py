@@ -18,6 +18,8 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
+from wokkel.test.helpers import XmlStreamStub
+
 from vigilo.common.conf import settings
 settings.load_module(__name__)
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder, \
@@ -36,14 +38,14 @@ class TestCreateRRDFile(unittest.TestCase):
         """Initialisation du test."""
         #unittest.TestCase.setUp(self)
 
-        #self.stub = XmlStreamStub()
-        #self.protocol.xmlstream = self.stub.xmlstream
-        #self.protocol.connectionInitialized()
+        self.stub = XmlStreamStub()
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
         settings['connector-metro']['rrd_base_dir'] = \
                 os.path.join(self.tmpdir, "rrds")
         os.mkdir(settings['connector-metro']['rrd_base_dir'])
         self.ntrf = NodeToRRDtoolForwarder(os.path.join(os.path.dirname(__file__), "connector-metro.db"))
+        self.ntrf.xmlstream = self.stub.xmlstream
+        self.ntrf.connectionInitialized()
 
     def tearDown(self):
         """Destruction des objets de test."""
