@@ -42,7 +42,7 @@ _ = translate(__name__)
 from vigilo.common import get_rrd_path
 
 from vigilo.connector_metro.rrdtool import RRDToolManager
-from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
+from vigilo.connector_metro.vigiconf_settings import ConfDB
 
 SNMP_ENTERPRISE_OID = "14132"
 
@@ -165,15 +165,12 @@ class SNMPtoRRDTool(object):
 
     def __init__(self):
         LOGGER.info(_("SNMP to RRDTool gateway started"))
-        self.hosts = {}
         # Process RRDTool
         self.rrdtool = RRDToolManager(readonly=True)
         # Vérification des permissions
         self.flight_checks()
         # Lecture de la conf
-        self.conf_timestamp = 0
-        read_conf = task.LoopingCall(self.load_conf)
-        read_conf.start(10) # toutes les 10s
+        self.confdb = ConfDB(settings['connector-metro']['config'])
         # Interface SNMP
         self.snmp = SNMPProtocol(self)
         stdio.StandardIO(self.snmp)
@@ -189,16 +186,6 @@ class SNMPtoRRDTool(object):
         afin de traiter les commandes.
         """
         return self.rrdtool.start()
-
-    def load_conf(self):
-        conffile = settings['connector-metro']['config']
-        current_timestamp = os.stat(conffile).st_mtime
-        if current_timestamp <= self.conf_timestamp:
-            return # ça n'a pas changé
-        LOGGER.debug("Re-reading configuration file")
-        vigiconf_settings.load_configuration(conffile)
-        self.hosts = vigiconf_settings['HOSTS']
-        self.conf_timestamp = current_timestamp
 
     def flight_checks(self):
         # permissions sur le dossier
@@ -226,12 +213,17 @@ class SNMPtoRRDTool(object):
         rrd_path_mode = settings['connector-metro']['rrd_path_mode']
         rrd_file = get_rrd_path(host, ds, rrd_dir, rrd_path_mode)
         if not os.path.exists(rrd_file):
-            return defer.fail(NoSuchRRDFile(_("no such RRD file: %s") % rrd_file))
-        step = int(self.hosts[host][ds]["step"])
-        duration = step * 3
-        args = ["AVERAGE", "--start", "-%s" % duration]
-        d = self.rrdtool.run("fetch", rrd_file, args)
-        d.addCallback(self.rrdtool_result, oid, duration)
+            return defer.fail(NoSuchRRDFile("no such RRD file: %s" % rrd_file))
+        d = self.confdb.get_datasource(host, ds)
+        def make_args(dsdata):
+            if dsdata["step"] is None:
+                dsdata["step"] = 300 # par défaut
+            step = int(dsdata["step"])
+            duration = step * 3
+            return ["AVERAGE", "--start", "-%d" % duration]
+        d.addCallback(make_args)
+        d.addCallback(lambda args: self.rrdtool.run("fetch", rrd_file, args))
+        d.addCallback(self.rrdtool_result, oid)
         return d
 
     def oid_to_rrdfile(self, oid):
@@ -244,7 +236,7 @@ class SNMPtoRRDTool(object):
                              % result))
         return "".join(map(chr, oid))
 
-    def rrdtool_result(self, result, oid, duration):
+    def rrdtool_result(self, result, oid):
         value = None
         for line in result.split("\n"):
             if not line.count(": "):
@@ -254,8 +246,7 @@ class SNMPtoRRDTool(object):
                 continue
             value = current_value
         if value is None:
-            raise RRDNoDataError("no value found for %s minutes"
-                                 % (duration / 60))
+            raise RRDNoDataError("no value found for 3 periods")
         if value.count("e") == 1:
             # conversion de la notation exposant
             value_base, value_exp = value.split("e")

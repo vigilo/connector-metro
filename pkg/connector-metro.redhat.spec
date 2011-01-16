@@ -34,19 +34,15 @@ Requires(preun): chkconfig
 Requires(preun): initscripts
 Requires(postun): initscripts
 
+# VigiConf
+Requires:   vigilo-vigiconf-local
+Obsoletes:  %{name}-vigiconf < 2.0.0-1.svn5779
+Provides:   %{name}-vigiconf = %{version}-%{release}
+
+
 %description
 Gateway from the Vigilo message bus (XMPP) to RRD files.
 This application is part of the Vigilo Project <http://vigilo-project.org>
-
-%package    vigiconf
-Summary:    Vigiconf setup for %{name}
-Group:      System/Servers
-Requires:   %{name}
-Requires:   vigilo-vigiconf-local
-
-%description vigiconf
-This package creates the links to use Vigiconf's generated configuration files
-with %{name}.
 
 
 %prep
@@ -58,15 +54,11 @@ make PYTHON=%{__python}
 %install
 rm -rf $RPM_BUILD_ROOT
 make install_files \
-	DESTDIR=$RPM_BUILD_ROOT \
-	PREFIX=%{_prefix} \
-	SYSCONFDIR=%{_sysconfdir} \
-	LOCALSTATEDIR=%{_localstatedir} \
-	PYTHON=%{__python}
-
-# Vigiconf
-ln -s %{_sysconfdir}/vigilo/vigiconf/prod/%{module}.conf.py \
-    $RPM_BUILD_ROOT%{_sysconfdir}/vigilo/%{module}/%{module}.conf.py
+    DESTDIR=$RPM_BUILD_ROOT \
+    PREFIX=%{_prefix} \
+    SYSCONFDIR=%{_sysconfdir} \
+    LOCALSTATEDIR=%{_localstatedir} \
+    PYTHON=%{__python}
 
 %find_lang %{name}
 
@@ -81,13 +73,13 @@ exit 0
 
 %preun
 if [ $1 = 0 ]; then
-	/sbin/service %{name} stop > /dev/null 2>&1 || :
-	/sbin/chkconfig --del %{name} || :
+    /sbin/service %{name} stop > /dev/null 2>&1 || :
+    /sbin/chkconfig --del %{name} || :
 fi
 
 %postun
 if [ "$1" -ge "1" ] ; then
-	/sbin/service %{name} condrestart > /dev/null 2>&1 || :
+    /sbin/service %{name} condrestart > /dev/null 2>&1 || :
 fi
 
 
@@ -109,10 +101,6 @@ rm -rf $RPM_BUILD_ROOT
 %attr(755,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/%{name}
-
-%files vigiconf
-%defattr(644,root,root,755)
-%{_sysconfdir}/vigilo/%{module}/%{module}.conf.py
 
 
 %changelog

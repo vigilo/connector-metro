@@ -56,6 +56,8 @@ class RRDToolManager(object):
         """
         Lance une instance de RRDtool dans un sous-processus
         """
+        if self.started:
+            return defer.succeed(None)
         try:
             self.ensureDirectory(settings['connector-metro']['rrd_base_dir'])
             self.checkBinary()
@@ -125,7 +127,10 @@ class RRDToolManager(object):
         @return: le Deferred contenant le résultat ou l'erreur
         @rtype: C{Deferred}
         """
-        return self._lock.run(self._dispatch, command, filename, args)
+        d = self.start() # enchaîne tout de suite si on est déjà démarré
+        d.addCallback(lambda x: self._lock.run(self._dispatch, command,
+                                               filename, args))
+        return d
 
     def _dispatch(self, command, filename, args):
         """
@@ -186,7 +191,11 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             args = " ".join(args)
         complete_cmd = "%s %s %s" % (command, filename, args)
         LOGGER.debug('Running this command: %s' % complete_cmd)
-        self.transport.write("%s\n" % complete_cmd)
+        try:
+            self.transport.write("%s\n" % complete_cmd)
+        except Exception, e:
+            self.working = False
+            return defer.fail(e)
         return self.deferred
 
     def outReceived(self, data):
@@ -218,8 +227,9 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
 
     def quit(self):
         self._keep_alive = False
-        self.transport.write("quit\n")
-        self.transport.loseConnection()
+        if self.transport is not None:
+            self.transport.write("quit\n")
+            self.transport.loseConnection()
         #self.transport.signalProcess('TERM')
 
     def processEnded(self, reason):

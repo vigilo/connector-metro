@@ -1,6 +1,6 @@
 [connector-metro]
 # Fichier de config distribué par VigiConf
-config = @SYSCONFDIR@/vigilo/connector-metro/connector-metro.conf.py
+config = @SYSCONFDIR@/vigilo/vigiconf/prod/connector-metro.db
 
 # Le dossier où seront stockés les fichiers RRD
 rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd

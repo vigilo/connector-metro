@@ -18,7 +18,7 @@ from vigilo.common.gettext import translate
 from vigilo.connector.forwarder import PubSubListener
 from vigilo.common import get_rrd_path
 from vigilo.connector_metro.rrdtool import RRDToolManager
-from vigilo.connector_metro.vigiconf_settings import vigiconf_settings
+from vigilo.connector_metro.vigiconf_settings import ConfDB
 
 LOGGER = get_logger(__name__)
 _ = translate(__name__)
@@ -30,19 +30,23 @@ class NotInConfiguration(KeyError):
 class InvalidMessage(ValueError):
     pass
 
+class CreationError(Exception):
+    pass
+
 class NodeToRRDtoolForwarder(PubSubListener):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
     """
 
-    def __init__(self, fileconf):
+    def __init__(self, confdb_path):
         """
         Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
 
-        @param fileconf: le nom du fichier contenant la définition des hôtes
-        @type fileconf: C{str}
+        @param confdb_path: le chemin du fichier SQLite contenant la
+            configuration en provenance de VigiConf
+        @type  confdb_path: C{str}
         """
 
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
@@ -53,14 +57,10 @@ class NodeToRRDtoolForwarder(PubSubListener):
         self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
         signal.signal(signal.SIGHUP, self._sighup_handler)
         # Configuration
-        self._conf_timestamp = 0
-        self.fileconf = fileconf
-        self._read_conf = task.LoopingCall(self.load_conf)
-        self._read_conf.start(10) # toutes les 10s (et maintenant)
+        self.confdb = ConfDB(confdb_path)
         # Sous-processus
         self.rrdtool = RRDToolManager()
         self.max_send_simult = len(self.rrdtool.pool)
-        self.rrdtool.start()
 
     def connectionInitialized(self):
         """
@@ -71,6 +71,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         super(NodeToRRDtoolForwarder, self).connectionInitialized()
         self.rrdtool.start()
 
+    @defer.inlineCallbacks
     def createRRD(self, filename, perf):
         """
         Crée un nouveau fichier RRD avec la configuration adéquate.
@@ -92,41 +93,39 @@ class NodeToRRDtoolForwarder(PubSubListener):
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
         host = perf["host"]
-        ds = perf["datasource"]
-        if host not in self.hosts or ds not in self.hosts[host]:
+        ds_name = perf["datasource"]
+        ds_list = yield self.confdb.get_host_datasources(host)
+        if ds_name not in ds_list:
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
-                            "in the configuration file (%(fileconf)s) !"), {
+                            "in the configuration !"), {
                                 'host': host,
-                                'ds': ds,
-                                'fileconf': self.fileconf,
+                                'ds': ds_name,
                         })
             raise NotInConfiguration()
 
-        values = self.hosts[host][ds]
-        rrd_cmd = ["--step", str(values["step"]), "--start", str(timestamp)]
-        for rra in values["RRA"]:
+        ds = yield self.confdb.get_datasource(host, ds_name)
+        rrd_cmd = ["--step", str(ds["step"]), "--start", str(timestamp)]
+        rras = yield self.confdb.get_rras(ds["id"])
+        for rra in rras:
             rrd_cmd.append("RRA:%s:%s:%s:%s" % \
                            (rra["type"], rra["xff"], \
                             rra["step"], rra["rows"]))
 
-        ds_tpl = values["DS"]
-        rrd_cmd.append("DS:%s:%s:%s:%s:%s" % \
-                   (ds_tpl["name"], ds_tpl["type"], ds_tpl["heartbeat"], \
-                    ds_tpl["min"], ds_tpl["max"]))
+        rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
+                       (ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
 
-        def chmod_644(result, filename):
-            os.chmod(filename, # chmod 644
-                     stat.S_IRUSR | stat.S_IWUSR | \
-                     stat.S_IRGRP | stat.S_IROTH )
-        def errback(result, filename):
+        try:
+            yield self.rrdtool.run("create", filename, rrd_cmd)
+        except Exception, e:
             LOGGER.error(_("RRDtool could not create the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
-                           'msg': result })
-        d = self.rrdtool.run("create", filename, rrd_cmd)
-        d.addCallback(chmod_644, filename)
-        d.addErrback(errback, filename)
-        return d
+                           'msg': e })
+            raise CreationError()
+        else:
+            os.chmod(filename, # chmod 644
+                     stat.S_IRUSR | stat.S_IWUSR | \
+                     stat.S_IRGRP | stat.S_IROTH )
 
     def _parse_message(self, msg):
         if msg.name != 'perf':
@@ -143,10 +142,14 @@ class NodeToRRDtoolForwarder(PubSubListener):
                               "'%(tag)s' tag)")
                 raise InvalidMessage(errormsg % {"tag": i})
 
-        if perf["host"] not in self.hosts:
-            raise NotInConfiguration("Skipping perf update for host %s"
-                                     % perf["host"])
-        return perf
+        d = self.confdb.has_host(perf["host"])
+        def cb(isinconf, perf):
+            if not isinconf:
+                raise NotInConfiguration("Skipping perf update for host %s"
+                                         % perf["host"])
+            return perf
+        d.addCallback(cb, perf)
+        return d
 
     def _makedirs(self, directory):
         # Création du dossier si besoin
@@ -189,6 +192,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """Sauf cas exceptionnel, on est toujours connecté"""
         return self.rrdtool.started
 
+    @defer.inlineCallbacks
     def processMessage(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
@@ -196,14 +200,14 @@ class NodeToRRDtoolForwarder(PubSubListener):
         @type msg: C{twisted.words.test.domish Xml}
         """
         try:
-            perf = self._parse_message(msg)
+            perf = yield self._parse_message(msg)
         except InvalidMessage, e:
             LOGGER.error(str(e))
-            return defer.succeed(None)
+            return
         except NotInConfiguration, e:
             self._messages_forwarded -= 1
             LOGGER.debug(str(e))
-            return defer.succeed(None)
+            return
 
         cmd = '%(timestamp)s:%(value)s' % perf
         rrd_dir = settings['connector-metro']['rrd_base_dir']
@@ -214,39 +218,20 @@ class NodeToRRDtoolForwarder(PubSubListener):
         self._makedirs(basedir)
 
         try:
-            create_d = self.create_if_needed(filename, perf)
+            yield self.create_if_needed(filename, perf)
         except NotInConfiguration:
             self._messages_forwarded -= 1
-            return defer.succeed(None) # On saute cette mise à jour
+            return # On saute cette mise à jour
+        except CreationError:
+            return # pas la peine de mettre à jour, la création a échoué
         # MAJ du RRD
-        def update_rrd(result):
-            update_d = self.rrdtool.run("update", filename, cmd)
-            update_d.addErrback(errback, filename)
-            return update_d # chaînage
-        def errback(result, filename):
+        try:
+            yield self.rrdtool.run("update", filename, cmd)
+        except Exception, e:
             LOGGER.error(_("RRDtool could not update the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
-                           'msg': result.getErrorMessage() })
-        create_d.addCallback(update_rrd)
-        return create_d
-
-    def load_conf(self):
-        """
-        Provoque un rechargement de la configuration Python
-        issue de VigiConf pour le connecteur de métrologie.
-        """
-        current_timestamp = os.stat(self.fileconf).st_mtime
-        if current_timestamp <= self._conf_timestamp:
-            return # ça n'a pas changé
-        LOGGER.debug("Re-reading configuration file")
-        try:
-            vigiconf_settings.load_configuration(self.fileconf)
-        except IOError, e:
-            LOGGER.exception(_("Got exception"))
-            raise e
-        self.hosts = vigiconf_settings['HOSTS']
-        self._conf_timestamp = current_timestamp
+                           'msg': e })
 
     def _sighup_handler(self, signum, frames):
         """
@@ -257,8 +242,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
         @param frames: Frames d'exécution interrompues par le signal.
         @type frames: C{list}
         """
-        LOGGER.info(_("Received signal to reload the configuration file"))
-        self.load_conf()
+        LOGGER.info(_("Received signal to reload the configuration"))
+        self.confdb.reload()
         # On appelle le précédent handler s'il y en a un.
         # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
         if callable(self._prev_sighup_handler):
@@ -268,6 +253,6 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """
         Utilisée par les tests
         """
-        self._read_conf.stop()
+        self.confdb.stop()
         self.rrdtool.stop()
 
