@@ -249,6 +249,14 @@ class NodeToRRDtoolForwarder(PubSubListener):
         if callable(self._prev_sighup_handler):
             self._prev_sighup_handler(signum, frames)
 
+    @defer.inlineCallbacks
+    def getStats(self):
+        """Récupère des métriques de fonctionnement du connecteur"""
+        stats = yield super(NodeToRRDtoolForwarder, self).getStats()
+        ds_count = yield self.confdb.count_datasources()
+        stats["pds_count"] = ds_count
+        defer.returnValue(stats)
+
     def stop(self):
         """
         Utilisée par les tests

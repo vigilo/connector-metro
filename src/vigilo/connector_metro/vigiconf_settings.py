@@ -130,3 +130,10 @@ class ConfDB(object):
         result.addCallback(format_result, properties)
         return result
 
+    def count_datasources(self):
+        if self._db is None:
+            return defer.succeed(0)
+        result = self._db.runQuery("SELECT COUNT(*) FROM perfdatasource")
+        result.addCallback(lambda r: r[0][0])
+        return result
+
