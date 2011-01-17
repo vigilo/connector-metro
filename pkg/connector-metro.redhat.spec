@@ -26,6 +26,7 @@ BuildRequires:   python26-babel
 Requires:   python26-distribute
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
+Requires:   sqlite >= 3
 
 Requires(pre): shadow-utils
 Requires(post): chkconfig

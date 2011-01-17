@@ -20,6 +20,7 @@ Requires:   python >= 2.5
 Requires:   python-setuptools
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
+Requires:   sqlite3-tools
 ######### Dependance from python dependance tree ########
 Requires:   vigilo-pubsub
 Requires:   vigilo-connector
