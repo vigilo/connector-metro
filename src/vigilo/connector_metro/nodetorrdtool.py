@@ -253,6 +253,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """
         Utilisée par les tests
         """
+        self._task_process_queue.stop()
         self.confdb.stop()
         self.rrdtool.stop()
 

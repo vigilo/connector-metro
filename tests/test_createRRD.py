@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# vim: set et sw=4 ts=4 ai:
 '''
 Created on 14 oct. 2009
 
@@ -10,6 +11,7 @@ from __future__ import absolute_import
 import tempfile
 import os
 import stat
+from StringIO import StringIO
 from shutil import rmtree
 import unittest
 
@@ -18,6 +20,7 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
+from twisted.internet import defer
 from wokkel.test.helpers import XmlStreamStub
 
 from vigilo.common.conf import settings
@@ -25,6 +28,38 @@ settings.load_module(__name__)
 from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder, \
                                                  NotInConfiguration
 from vigilo.connector.converttoxml import text2xml
+
+from vigilo.connector_metro.rrdtool import RRDToolManager
+
+class RRDToolManagerStub(RRDToolManager):
+    """
+    On a pas le droit de lancer des sous-processus dans un test unitaire, sous
+    peine de les voir se transformer en zombies. Le virus vient de
+    l'intégration de twisted avec nose, parce qu'il lance le réacteur dans un
+    thread, et qu'il n'installe pas les gestionnaires de signaux (SIGCHLD)
+    @see: U{http://twistedmatrix.com/pipermail/twisted-python/2007-February/014782.html}
+    """
+    def __init__(self):
+        self.commands = []
+        super(RRDToolManagerStub, self).__init__()
+
+    def buildPool(self, pool_size):
+        for i in range(pool_size):
+            proc = RRDToolProcessProtocolStub(self.commands)
+            self.pool.append(proc)
+
+class RRDToolProcessProtocolStub(object):
+    def __init__(self, commands):
+        self.working = False
+        self.commands = commands
+    def start(self):
+        return defer.succeed(None)
+    def quit(self):
+        pass
+    def run(self, command, filename, args):
+        self.commands.append((command, filename, args))
+        open(filename, "w").close() # touch filename
+        return defer.succeed("")
 
 
 class TestCreateRRDFile(unittest.TestCase):
@@ -43,8 +78,11 @@ class TestCreateRRDFile(unittest.TestCase):
         settings['connector-metro']['rrd_base_dir'] = \
                 os.path.join(self.tmpdir, "rrds")
         os.mkdir(settings['connector-metro']['rrd_base_dir'])
-        self.ntrf = NodeToRRDtoolForwarder(os.path.join(os.path.dirname(__file__), "connector-metro.db"))
+        self.ntrf = NodeToRRDtoolForwarder(os.path.join(
+                        os.path.dirname(__file__), "connector-metro.db"))
         self.ntrf.xmlstream = self.stub.xmlstream
+        self.rrdtool = RRDToolManagerStub()
+        self.ntrf.rrdtool = self.rrdtool
         self.ntrf.connectionInitialized()
 
     def tearDown(self):
@@ -65,9 +103,21 @@ class TestCreateRRDFile(unittest.TestCase):
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
         d = self.ntrf.processMessage(xml)
         # on vérifie que le fichier correspondant a bien été créé
-        def cb(_):
+        def check_created(r):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
-        return d.addCallback(cb)
+        def check_creation_command(r):
+            self.assertEqual(self.rrdtool.commands[0], ('create', rrdfile,
+                ['--step', '300', '--start', '1165939729',
+                 'RRA:AVERAGE:0.5:1:600', 'RRA:AVERAGE:0.5:6:700',
+                 'RRA:AVERAGE:0.5:24:775', 'RRA:AVERAGE:0.5:288:732',
+                 'DS:DS:GAUGE:600:U:U']))
+        def check_update_command(r):
+            self.assertEqual(self.rrdtool.commands[1],
+                             ('update', rrdfile, '1165939739:12'))
+        d.addCallback(check_created)
+        d.addCallback(check_creation_command)
+        d.addCallback(check_update_command)
+        return d
 
     @deferred(timeout=5)
     def test_unhandled_host(self):

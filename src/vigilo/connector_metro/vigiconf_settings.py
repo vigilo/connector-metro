@@ -38,6 +38,7 @@ class ConfDB(object):
 
     def stop(self):
         self._reload_task.stop()
+        self._db.close()
 
     def start_db(self):
         if not os.path.exists(self.path):
@@ -45,7 +46,7 @@ class ConfDB(object):
             raise NoConfDBError()
         self._timestamp = os.stat(self.path).st_mtime
         # threads: http://twistedmatrix.com/trac/ticket/3629
-        self._db = adbapi.ConnectionPool("sqlite3.dbapi2", self.path,
+        self._db = adbapi.ConnectionPool("sqlite3", self.path,
                                          check_same_thread=False)
         LOGGER.debug("Connected to the configuration database")
 
