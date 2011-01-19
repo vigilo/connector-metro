@@ -1,4 +1,4 @@
-# Default configuration for Vigilo-Nagios connector
+# Default configuration for Vigilo's connector-metro
 
 # Those are twistd(1) options
 #OPTIONS=""
