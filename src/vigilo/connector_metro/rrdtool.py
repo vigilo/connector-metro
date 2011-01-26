@@ -29,6 +29,11 @@ class NoAvailableProcess(Exception):
     """
     pass
 
+class RRDToolError(Exception):
+    """Erreur à l'exécution de RRDTool"""
+    def __init__(self, filename, message):
+        Exception.__init__(self, message)
+        self.filename = filename
 
 class RRDToolManager(object):
     """
@@ -40,17 +45,27 @@ class RRDToolManager(object):
         self.readonly = readonly
         self.job_count = 0
         self.started = False
-        # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
-        pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
+        try:
+            pool_size = settings["connector-metro"].as_int("rrd_processes")
+        except KeyError:
+            pool_size = None
+        if pool_size is None:
+            # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
+            pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
+            if pool_size > 4:
+                pool_size = 4 # on limite, sinon on passe trop de temps à choisir
         self.pool = []
         self._lock = defer.DeferredSemaphore(pool_size)
         self.buildPool(pool_size)
-        self.work_queue = []
 
     def buildPool(self, pool_size):
         rrd_bin = settings['connector-metro']['rrd_bin']
+        env = {}
+        if self.rrdcached:
+            env["RRDCACHED_ADDRESS"] = self.rrdcached
         for i in range(pool_size):
-            self.pool.append(RRDToolProcessProtocol(rrd_bin))
+            self.pool.append(RRDToolProcessProtocol(rrd_bin, env))
 
     def start(self):
         """
@@ -128,8 +143,11 @@ class RRDToolManager(object):
         @rtype: C{Deferred}
         """
         d = self.start() # enchaîne tout de suite si on est déjà démarré
-        d.addCallback(lambda x: self._lock.run(self._dispatch, command,
-                                               filename, args))
+        if len(self.pool) == 1:
+            d.addCallback(lambda x: self.pool[0].run(command, filename, args))
+        else:
+            d.addCallback(lambda x: self._lock.run(self._dispatch, command,
+                                                   filename, args))
         return d
 
     def _dispatch(self, command, filename, args):
@@ -148,20 +166,23 @@ class RRDToolManager(object):
 
 class RRDToolProcessProtocol(protocol.ProcessProtocol):
 
-    def __init__(self, rrd_bin):
+    def __init__(self, rrd_bin, env={}):
         self.rrd_bin = rrd_bin
         self.deferred = None
         self.deferred_start = None
         self._current_data = []
         self._keep_alive = True
+        self._filename = None
         self.working = False
+        self.env = env
 
     def start(self):
         if self.transport is not None:
             return defer.succeed(self.transport.pid)
         LOGGER.debug("Starting rrdtool process in server mode")
         self.deferred_start = defer.Deferred()
-        reactor.spawnProcess(self, self.rrd_bin, [self.rrd_bin, "-"])
+        reactor.spawnProcess(self, self.rrd_bin, [self.rrd_bin, "-"],
+                             env=self.env)
         return self.deferred_start
 
     def connectionMade(self):
@@ -187,6 +208,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         """
         self.working = True
         self.deferred = defer.Deferred()
+        self._filename = filename
         if isinstance(args, list):
             args = " ".join(args)
         complete_cmd = "%s %s %s" % (command, filename, args)
@@ -220,7 +242,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                 self.deferred.callback("\n".join(self._current_data))
                 break
             elif line.startswith("ERROR: "):
-                self.deferred.errback(line[7:])
+                self.deferred.errback(RRDToolError(self._filename, line[7:]))
                 break
             self._current_data.append(line)
         self._current_data = []

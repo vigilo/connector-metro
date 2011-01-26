@@ -40,10 +40,20 @@ Requires:   vigilo-vigiconf-local
 Obsoletes:  %{name}-vigiconf < 2.0.0-1.svn5779
 Provides:   %{name}-vigiconf = %{version}-%{release}
 
-
 %description
 Gateway from the Vigilo message bus (XMPP) to RRD files.
 This application is part of the Vigilo Project <http://vigilo-project.org>
+
+%package    -n vigilo-rrdcached
+Summary:    RRD cache daemon
+Group:      System/Servers
+Requires:   %{name}
+Requires:   rrdtool >= 1.4
+
+%description -n vigilo-rrdcached
+This contains an init script and configuration files to use the RRD cache
+daemon within Vigilo.
+This package is part of the Vigilo Project <http://vigilo-project.org>
 
 
 %prep
@@ -83,6 +93,20 @@ if [ "$1" -ge "1" ] ; then
     /sbin/service %{name} condrestart > /dev/null 2>&1 || :
 fi
 
+%post -n vigilo-rrdcached
+/sbin/chkconfig --add vigilo-rrdcached || :
+
+%preun -n vigilo-rrdcached
+if [ $1 = 0 ]; then
+    /sbin/service vigilo-rrdcached stop > /dev/null 2>&1 || :
+    /sbin/chkconfig --del vigilo-rrdcached || :
+fi
+
+%postun -n vigilo-rrdcached
+if [ "$1" -ge "1" ] ; then
+    /sbin/service vigilo-rrdcached condrestart > /dev/null 2>&1 || :
+fi
+
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -95,12 +119,18 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_sysconfdir}/vigilo/
 %dir %{_sysconfdir}/vigilo/%{module}
 %attr(640,root,vigilo-metro) %config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
-%config(noreplace) %{_sysconfdir}/sysconfig/*
+%config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 %{python26_sitelib}/*
 %dir %{_localstatedir}/lib/vigilo
 %attr(755,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/%{name}
+
+%files -n vigilo-rrdcached
+%defattr(644,root,root,755)
+%attr(744,root,root) %{_initrddir}/vigilo-rrdcached
+%config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
+%attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/vigilo-rrdcached
 
 
 %changelog

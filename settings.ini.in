@@ -22,6 +22,13 @@ rrd_path_mode = hash
 # Le chemin vers l'exécutable "rrdtool"
 rrd_bin = /usr/bin/rrdtool
 
+# Nombre de processus rrdtool à lancer. Capacité mesurée pour un processus:
+# plus de 100 mises à jour par seconde sur une machine moderne (2010).
+#rrd_processes = 4
+
+# Utilisation du démon de mise à jour RRDCacheD. Nécessite RRDTool >= 1.4
+#rrdcached = @LOCALSTATEDIR@/lib/vigilo/connector-metro/rrdcached.sock
+
 
 [bus]
 # Nom ou adresse IP du serveur XMPP à utiliser.

@@ -1,0 +1,84 @@
+#! /bin/sh
+#
+# vigilo-rrdcached - Daemon to handle a high number of RRDTool updates
+#
+#
+# chkconfig: 345 95 05
+# description: Starts and stops the RRD cache daemon
+### BEGIN INIT INFO
+# Provides: vigilo-rrdcached
+# Required-Start: $network $syslog
+# Should-Start: $named
+# Required-Stop: $network $syslog
+# Should-Stop: $named
+# Default-Start: 3 4 5
+# Short-Description: RRD cache daemon
+# Description: Daemon to handle a high number of RRDTool updates
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/bin/rrdcached
+NAME=vigilo-rrdcached
+LOCK_FILE=/var/lock/subsys/$NAME
+
+USER=vigilo-metro
+PID_FILE=/var/run/$NAME/$NAME.pid
+OPTIONS="-m 660 -w 60 -l /var/lib/vigilo/connector-metro/rrdcached.sock"
+
+if [ -f /etc/sysconfig/$NAME ] ; then
+    . /etc/sysconfig/$NAME
+fi
+if [ -f /etc/init.d/functions ] ; then
+    . /etc/init.d/functions
+fi
+
+export USER PID_FILE OPTIONS
+
+test -x $DAEMON || exit 0
+
+start() {
+    [ -f $LOCK_FILE ] && return
+
+    echo -n "Starting $NAME: "
+    daemon --user $USER --pidfile $PID_FILE $DAEMON -p $PID_FILE $OPTIONS
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && touch $LOCK_FILE
+}
+
+stop() {
+    echo -n "Shutting down $NAME: "
+    killproc -p $PID_FILE $NAME
+    RETVAL=$?
+    echo
+    [ $RETVAL -eq 0 ] && rm -f $LOCK_FILE
+}
+
+
+case "$1" in
+    start)
+        start
+    ;;
+    stop)
+        stop
+    ;;
+    status)
+        status -p $PID_FILE $NAME
+    ;;
+    restart)
+        stop
+        start
+    ;;
+    condrestart)
+        if [ -f $LOCK_FILE ]; then
+            stop
+            start
+        fi
+    ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|condrestart|status}" >&2
+        RETVAL=1
+    ;;
+esac
+
+exit $RETVAL

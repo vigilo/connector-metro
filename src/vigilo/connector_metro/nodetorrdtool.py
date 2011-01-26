@@ -17,7 +17,7 @@ from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
 from vigilo.connector.forwarder import PubSubListener
 from vigilo.common import get_rrd_path
-from vigilo.connector_metro.rrdtool import RRDToolManager
+from vigilo.connector_metro.rrdtool import RRDToolManager, RRDToolError
 from vigilo.connector_metro.vigiconf_settings import ConfDB
 
 LOGGER = get_logger(__name__)
@@ -174,16 +174,24 @@ class NodeToRRDtoolForwarder(PubSubListener):
                 LOGGER.error(_("Unable to create the directory '%s'"), cur_dir)
                 raise e
 
-    def create_if_needed(self, filename, msgdata):
+    def _get_msg_filename(self, msgdata):
+        rrd_dir = settings['connector-metro']['rrd_base_dir']
+        rrd_path_mode = settings['connector-metro']['rrd_path_mode']
+        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
+                                rrd_dir, rrd_path_mode)
+        return filename
+
+    def create_if_needed(self, msgdata):
         """Création du RRD si besoin"""
-        if os.path.isfile(filename):
-            return defer.succeed(None)
+        filename = self._get_msg_filename(msgdata)
+        if os.path.exists(filename):
+            return defer.succeed(msgdata)
         # compatibilité
         old_filename = os.path.join(self.rrd_base_dir, msgdata["host"], "%s.rrd"
                                     % urllib.quote_plus(msgdata["datasource"]))
         if os.path.isfile(old_filename):
             os.rename(old_filename, filename)
-            return defer.succeed(None)
+            return defer.succeed(msgdata)
         else:
             # création
             return self.createRRD(filename, msgdata)
@@ -192,46 +200,54 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """Sauf cas exceptionnel, on est toujours connecté"""
         return self.rrdtool.started
 
-    @defer.inlineCallbacks
     def processMessage(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
+
+        Attention, c'est complexe parce qu'on a pas le droit d'utiliser
+        inlineDeferred (sinon le yield qui est fait sur le résultat de cette
+        fonction ne servira à rien et on va manger de la RAM comme des gorets
+        en consommant la file d'attente)
+
         @param msg: Message à transmettre
         @type msg: C{twisted.words.test.domish Xml}
         """
-        try:
-            perf = yield self._parse_message(msg)
-        except InvalidMessage, e:
-            LOGGER.error(str(e))
-            return
-        except NotInConfiguration, e:
-            self._messages_forwarded -= 1
-            LOGGER.debug(str(e))
-            return
+        d = self._parse_message(msg)
+        def eb(f):
+            err_class = f.trap(InvalidMessage, NotInConfiguration, CreationError)
+            if err_class == InvalidMessage:
+                LOGGER.error(str(f.value))
+            elif err_class == NotInConfiguration:
+                self._messages_forwarded -= 1
+                #LOGGER.debug(str(f.value))
+            return None
+        def create_if_needed(perf):
+            d = defer.Deferred()
+            create_d = self.create_if_needed(perf)
+            create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
+            return d
+        d.addCallbacks(create_if_needed, eb)
 
-        cmd = '%(timestamp)s:%(value)s' % perf
-        rrd_dir = settings['connector-metro']['rrd_base_dir']
-        rrd_path_mode = settings['connector-metro']['rrd_path_mode']
-        filename = get_rrd_path(perf["host"], perf["datasource"],
-                                rrd_dir, rrd_path_mode)
-        basedir = os.path.dirname(filename)
-        self._makedirs(basedir)
+        def run_rrdtool(perf):
+            if perf is None:
+                return None
+            cmd = '%(timestamp)s:%(value)s' % perf
+            filename = self._get_msg_filename(perf)
+            basedir = os.path.dirname(filename)
+            self._makedirs(basedir)
+            return self.rrdtool.run("update", filename, cmd)
+        d.addCallbacks(run_rrdtool, eb)
 
-        try:
-            yield self.create_if_needed(filename, perf)
-        except NotInConfiguration:
-            self._messages_forwarded -= 1
-            return # On saute cette mise à jour
-        except CreationError:
-            return # pas la peine de mettre à jour, la création a échoué
-        # MAJ du RRD
-        try:
-            yield self.rrdtool.run("update", filename, cmd)
-        except Exception, e:
-            LOGGER.error(_("RRDtool could not update the file: "
-                           "%(filename)s. Message: %(msg)s"),
-                         { 'filename': filename,
-                           'msg': e })
+        def eb_rrdtool(f):
+            f.trap(RRDToolError)
+            LOGGER.error(_("RRDtool could not update the file %(filename)s. "
+                           "Message: %(msg)s"), {
+                         'filename': f.value.filename,
+                         'msg': f.getErrorMessage() })
+        d.addErrback(eb_rrdtool)
+
+        return d
+
 
     def _sighup_handler(self, signum, frames):
         """

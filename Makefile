@@ -20,12 +20,18 @@ install_files: settings.ini $(PYTHON)
 	echo /etc/rc.d/init.d/$(PKGNAME) >> INSTALLED_FILES
 	install -p -m 644 -D pkg/initconf.$(DISTRO) $(DESTDIR)$(INITCONFDIR)/$(PKGNAME)
 	echo $(INITCONFDIR)/$(PKGNAME) >> INSTALLED_FILES
+	# rrdcached
+	install -p -m 755 -D pkg/init.rrdcached.$(DISTRO) $(DESTDIR)/etc/rc.d/init.d/vigilo-rrdcached
+	echo /etc/rc.d/init.d/vigilo-rrdcached >> INSTALLED_FILES
+	install -p -m 644 -D pkg/initconf.rrdcached.$(DISTRO) $(DESTDIR)$(INITCONFDIR)/vigilo-rrdcached
+	echo $(INITCONFDIR)/vigilo-rrdcached >> INSTALLED_FILES
 
 install_permissions:
 	chown $(USER):$(USER) \
 			$(LOCALSTATEDIR)/lib/vigilo/rrd \
 			$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
-			$(LOCALSTATEDIR)/run/$(NAME)
+			$(LOCALSTATEDIR)/run/$(PKGNAME)
+			$(LOCALSTATEDIR)/run/vigilo-rrdcached
 	chmod 755 $(LOCALSTATEDIR)/lib/vigilo/rrd
 
 clean: clean_python

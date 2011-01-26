@@ -67,6 +67,7 @@ setup(name='vigilo-connector-metro',
                     (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
                     (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
                     (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
+                    (os.path.join(localstatedir, "run/vigilo-rrdcached"), []),
                    ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
         )
 
