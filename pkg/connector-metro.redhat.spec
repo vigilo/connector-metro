@@ -47,8 +47,9 @@ This application is part of the Vigilo Project <http://vigilo-project.org>
 %package    -n vigilo-rrdcached
 Summary:    RRD cache daemon
 Group:      System/Servers
-Requires:   %{name}
 Requires:   rrdtool >= 1.4
+# a cause des droits sur les fichiers (vigilo-metro)
+Requires(pre):   %{name}
 
 %description -n vigilo-rrdcached
 This contains an init script and configuration files to use the RRD cache
