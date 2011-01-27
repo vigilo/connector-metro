@@ -207,6 +207,8 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         @rtype: C{Deferred}
         """
         self.working = True
+        assert self.deferred is None, \
+                _("Le process n'a pas encore fini le job précédent")
         self.deferred = defer.Deferred()
         self._filename = filename
         if isinstance(args, list):
@@ -246,6 +248,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                 break
             self._current_data.append(line)
         self._current_data = []
+        self.deferred = None
 
     def quit(self):
         self._keep_alive = False
