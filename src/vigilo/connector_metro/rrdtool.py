@@ -45,7 +45,6 @@ class RRDToolManager(object):
         self.readonly = readonly
         self.job_count = 0
         self.started = False
-        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
         try:
             pool_size = settings["connector-metro"].as_int("rrd_processes")
         except KeyError:
@@ -55,6 +54,9 @@ class RRDToolManager(object):
             pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
             if pool_size > 4:
                 pool_size = 4 # on limite, sinon on passe trop de temps à choisir
+        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
+        if self.rrdcached is not None:
+            pool_size = 1
         self.pool = []
         self._lock = defer.DeferredSemaphore(pool_size)
         self.buildPool(pool_size)
@@ -158,8 +160,8 @@ class RRDToolManager(object):
         for index, rrdtool in enumerate(self.pool):
             if rrdtool.working:
                 continue
-            LOGGER.debug("Running job %d on process %d",
-                         self.job_count, index+1)
+            #LOGGER.debug("Running job %d on process %d",
+            #             self.job_count, index+1)
             return rrdtool.run(command, filename, args)
         raise NoAvailableProcess()
 
@@ -210,11 +212,17 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         assert self.deferred is None, \
                 _("Le process n'a pas encore fini le job précédent")
         self.deferred = defer.Deferred()
+        def state_finish(r):
+            self.working = False
+            self._current_data = []
+            self.deferred = None
+            return r
+        self.deferred.addCallback(state_finish)
         self._filename = filename
         if isinstance(args, list):
             args = " ".join(args)
         complete_cmd = "%s %s %s" % (command, filename, args)
-        LOGGER.debug('Running this command: %s' % complete_cmd)
+        #LOGGER.debug('Running this command: %s' % complete_cmd)
         try:
             self.transport.write("%s\n" % complete_cmd)
         except Exception, e:
@@ -238,7 +246,6 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             LOGGER.warning(_("No deferred available in _handle_result(), "
                              "this should not happen"))
             return
-        self.working = False
         for line in data.split("\n"):
             if line.startswith("OK "):
                 self.deferred.callback("\n".join(self._current_data))
@@ -247,8 +254,6 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                 self.deferred.errback(RRDToolError(self._filename, line[7:]))
                 break
             self._current_data.append(line)
-        self._current_data = []
-        self.deferred = None
 
     def quit(self):
         self._keep_alive = False
