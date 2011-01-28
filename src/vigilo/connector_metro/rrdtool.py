@@ -45,6 +45,7 @@ class RRDToolManager(object):
         self.readonly = readonly
         self.job_count = 0
         self.started = False
+        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
         try:
             pool_size = settings["connector-metro"].as_int("rrd_processes")
         except KeyError:
@@ -54,9 +55,6 @@ class RRDToolManager(object):
             pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
             if pool_size > 4:
                 pool_size = 4 # on limite, sinon on passe trop de temps à choisir
-        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
-        if self.rrdcached is not None:
-            pool_size = 1
         self.pool = []
         self._lock = defer.DeferredSemaphore(pool_size)
         self.buildPool(pool_size)
