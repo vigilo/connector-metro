@@ -217,7 +217,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             self._current_data = []
             self.deferred = None
             return r
-        self.deferred.addCallback(state_finish)
+        self.deferred.addBoth(state_finish)
         self._filename = filename
         if isinstance(args, list):
             args = " ".join(args)
