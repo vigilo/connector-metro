@@ -7,6 +7,7 @@ import os
 
 from twisted.internet import defer, threads, task
 from twisted.enterprise import adbapi
+from twisted.python.failure import Failure
 
 from vigilo.common.logging import get_logger
 LOGGER = get_logger(__name__)
@@ -113,6 +114,9 @@ class ConfDB(object):
                 "name = ? AND hostname = ?" % ", ".join(properties[1:]),
                 (dsname, hostname) )
         def format_result(result, properties):
+            if not result:
+                raise KeyError("No such datasource %s on host %s"
+                               % (dsname, hostname))
             d = {}
             for propindex, propname in enumerate(properties):
                 d[propname] = str(result[0][propindex])

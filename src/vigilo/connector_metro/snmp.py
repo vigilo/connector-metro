@@ -47,7 +47,7 @@ from vigilo.connector_metro.vigiconf_settings import ConfDB
 SNMP_ENTERPRISE_OID = "14132"
 
 
-class NoSuchRRDFile(IOError):
+class NoSuchRRDFile(Exception):
     pass
 
 class RRDNoDataError(Exception):
@@ -157,6 +157,7 @@ class SNMPProtocol(basic.LineReceiver):
                 self.sendLine("string")
                 self.sendLine(error.getErrorMessage())
                 return
+        LOGGER.warning(error.getTraceback())
         LOGGER.warning(error.getErrorMessage())
         self.sendLine("NONE")
 
@@ -221,7 +222,9 @@ class SNMPtoRRDTool(object):
             step = int(dsdata["step"])
             duration = step * 3
             return ["AVERAGE", "--start", "-%d" % duration]
-        d.addCallback(make_args)
+        def eb(error):
+            raise NoSuchRRDFile(error.getErrorMessage())
+        d.addCallbacks(make_args, eb)
         d.addCallback(lambda args: self.rrdtool.run("fetch", rrd_file, args))
         d.addCallback(self.rrdtool_result, oid)
         return d
