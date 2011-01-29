@@ -20,13 +20,15 @@ class ConnectorServiceMaker(object):
 
     def makeService(self):
         """ the service that wraps everything the connector needs. """
-        from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
-        from vigilo.connector.status import StatusPublisher
         from vigilo.common.conf import settings
         settings.load_module(__name__)
 
         from vigilo.common.logging import get_logger
         LOGGER = get_logger(__name__)
+
+        from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
+        from vigilo.connector.presence import PresenceManager
+        from vigilo.connector.status import StatusPublisher
 
         try:
             conf_ = settings['connector-metro']['config']
@@ -44,11 +46,13 @@ class ConnectorServiceMaker(object):
             raise
         message_consumer.setHandlerParent(xmpp_client)
 
+        # Présence
+        presence_manager = PresenceManager()
+        presence_manager.setHandlerParent(xmpp_client)
+
         # Statistiques
-        stats_publisher = StatusPublisher(
-                            message_consumer,
-                            settings["connector"].get("hostname", None),
-                            "vigilo-connector-metro")
+        stats_publisher = StatusPublisher(message_consumer,
+                            settings["connector"].get("hostname", None))
         stats_publisher.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
