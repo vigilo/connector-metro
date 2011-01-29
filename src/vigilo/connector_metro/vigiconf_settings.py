@@ -30,6 +30,7 @@ class ConfDB(object):
         self._db = None
         self._timestamp = 0
         self._reload_task = task.LoopingCall(self.reload)
+        self._cache = {"hosts": None}
         self.start()
 
     def start(self):
@@ -49,6 +50,8 @@ class ConfDB(object):
         self._db = adbapi.ConnectionPool("sqlite3", self.path,
                                          check_same_thread=False)
         LOGGER.debug("Connected to the configuration database")
+        # mise en cache de la liste des hôtes
+        self.get_hosts()
 
     def reload(self):
         """
@@ -66,6 +69,9 @@ class ConfDB(object):
         self._db.close()
         self._db.start()
         self._timestamp = current_timestamp
+        # mise en cache de la liste des hôtes
+        self._cache["hosts"] = None
+        self.get_hosts()
 
     def get_hosts(self):
         if self._db is None:
@@ -73,11 +79,17 @@ class ConfDB(object):
         result = self._db.runQuery("SELECT DISTINCT hostname FROM "
                                    "perfdatasource")
         result.addCallback(lambda results: [str(r[0]) for r in results])
+        def cache_hosts(hosts):
+            self._cache["hosts"] = hosts
+            return hosts
+        result.addCallback(cache_hosts)
         return result
 
     def has_host(self, hostname):
         if self._db is None:
             return defer.succeed(False)
+        if self._cache["hosts"] is not None:
+            return defer.succeed(hostname in self._cache["hosts"])
         result = self._db.runQuery("SELECT COUNT(*) FROM perfdatasource "
                                    "WHERE hostname = ?", (hostname,) )
         result.addCallback(lambda results: bool(results[0][0]))
