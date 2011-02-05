@@ -52,7 +52,8 @@ class ConnectorServiceMaker(object):
 
         # Statistiques
         stats_publisher = StatusPublisher(message_consumer,
-                            settings["connector"].get("hostname", None))
+                        settings["connector"].get("hostname", None),
+                        node=settings["connector"].get("status_node", None))
         stats_publisher.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
