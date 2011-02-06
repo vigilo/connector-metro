@@ -47,7 +47,7 @@ class ConnectorServiceMaker(object):
         message_consumer.setHandlerParent(xmpp_client)
 
         # Présence
-        presence_manager = PresenceManager()
+        presence_manager = PresenceManager(forwarder=message_consumer)
         presence_manager.setHandlerParent(xmpp_client)
 
         # Statistiques
