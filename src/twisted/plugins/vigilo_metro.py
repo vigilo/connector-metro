@@ -19,7 +19,7 @@ class MetroConnectorServiceMaker(object):
     """
     implements(service.IServiceMaker, IPlugin)
     tapname = "vigilo-metro"
-    description = "Vigilo connector (for performance data)"
+    description = "Vigilo connector for performance data"
     options = options.Options
 
     def makeService(self, options):
@@ -31,8 +31,6 @@ class MetroConnectorServiceMaker(object):
         LOGGER = get_logger('vigilo.connector_metro')
 
         from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
-        from vigilo.connector.presence import PresenceManager
-        from vigilo.connector.status import StatusPublisher
 
         try:
             conf_ = settings['connector-metro']['config']
@@ -51,12 +49,16 @@ class MetroConnectorServiceMaker(object):
         message_consumer.setHandlerParent(xmpp_client)
 
         # Présence
+        from vigilo.connector.presence import PresenceManager
         presence_manager = PresenceManager()
         presence_manager.setHandlerParent(xmpp_client)
 
         # Statistiques
+        from vigilo.connector.status import StatusPublisher
+        servicename = options.get("name", "vigilo-connector-metro")
         stats_publisher = StatusPublisher(message_consumer,
-                            settings["connector"].get("hostname", None))
+                            settings["connector"].get("hostname", None),
+                            servicename=servicename)
         stats_publisher.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
