@@ -50,7 +50,9 @@ setup(name='vigilo-connector-metro',
         packages=[
             'vigilo',
             'vigilo.connector_metro',
+            'twisted',
             ],
+        package_data={'twisted': ['plugins/vigilo_metro.py']},
         entry_points={
             'console_scripts': [
                 'vigilo-connector-metro = vigilo.connector_metro.main:main',
