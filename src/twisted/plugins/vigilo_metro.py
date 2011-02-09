@@ -25,7 +25,10 @@ class MetroConnectorServiceMaker(object):
     def makeService(self, options):
         """ the service that wraps everything the connector needs. """
         from vigilo.common.conf import settings
-        settings.load_module('vigilo.connector_metro')
+        if options["config"] is not None:
+            settings.load_file(options["config"])
+        else:
+            settings.load_module('vigilo.connector_metro')
 
         from vigilo.common.logging import get_logger
         LOGGER = get_logger('vigilo.connector_metro')

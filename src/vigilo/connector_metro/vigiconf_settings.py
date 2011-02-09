@@ -39,8 +39,10 @@ class ConfDB(object):
             self._reload_task.start(10) # toutes les 10s
 
     def stop(self):
-        self._reload_task.stop()
-        self._db.close()
+        if self._reload_task.running:
+            self._reload_task.stop()
+        if self._db is not None:
+            self._db.close()
 
     def start_db(self):
         if not os.path.exists(self.path):

@@ -13,7 +13,6 @@ from twisted.internet import reactor, protocol, defer
 from twisted.internet.error import ProcessDone, ProcessTerminated
 
 from vigilo.common.conf import settings
-settings.load_module(__name__)
 
 from vigilo.common.logging import get_logger
 LOGGER = get_logger(__name__, silent_load=True)
@@ -265,8 +264,8 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             LOGGER.info(_('The RRDTool process exited normally'))
         elif isinstance(reason.value, ProcessTerminated):
             LOGGER.warning(_('The RRDTool process was terminated abnormally '
-                             'with exit code %(rcode)d and message: %(msg)s'),
-                           {"rcode": reason.value.exitCode,
+                             'with exit code %(rcode)s and message: %(msg)s'),
+                           {"rcode": reason.value.exitCode, # peut être None
                             "msg": reason.getErrorMessage()})
         if not self._keep_alive:
             return

@@ -11,7 +11,6 @@ import urllib
 from twisted.internet import task, defer
 
 from vigilo.common.conf import settings
-settings.load_module(__name__)
 
 from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
@@ -277,7 +276,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """
         Utilisée par les tests
         """
-        self._task_process_queue.stop()
+        if self._task_process_queue.running:
+            self._task_process_queue.stop()
         self.confdb.stop()
         self.rrdtool.stop()
 
