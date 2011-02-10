@@ -1,6 +1,5 @@
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
-""" Metrology connector Pubsub client. """
-from __future__ import with_statement
+"""Metrology to RRDTool connector."""
 import sys, os
 
 from zope.interface import implements
@@ -58,10 +57,13 @@ class MetroConnectorServiceMaker(object):
 
         # Statistiques
         from vigilo.connector.status import StatusPublisher
-        servicename = options.get("name", "vigilo-connector-metro")
+        servicename = options["name"]
+        if servicename is None:
+            servicename = "vigilo-connector-metro"
         stats_publisher = StatusPublisher(message_consumer,
-                            settings["connector"].get("hostname", None),
-                            servicename=servicename)
+                        settings["connector"].get("hostname", None),
+                        servicename=servicename,
+                        node=settings["connector"].get("status_node", None))
         stats_publisher.setHandlerParent(xmpp_client)
 
         root_service = service.MultiService()
