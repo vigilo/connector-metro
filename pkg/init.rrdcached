@@ -47,7 +47,7 @@ start() {
 }
 
 stop() {
-    echo -n "Shutting down $NAME: "
+    echo -n "Stopping $NAME: "
     killproc -p $PID_FILE $NAME
     RETVAL=$?
     echo

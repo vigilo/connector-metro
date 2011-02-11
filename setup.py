@@ -35,11 +35,9 @@ setup(name='vigilo-connector-metro',
         description='vigilo metrology connector component',
         license='http://www.gnu.org/licenses/gpl-2.0.html',
         long_description='The vigilo metrology connector component is a connector between:\n'
-        +'   - XMPP/PubSub BUS of message\n'
+        +'   - XMPP/PubSub message bus\n'
         +'   - RRDtool\n',
         install_requires=[
-            # dashes become underscores
-            # order is important (wokkel before Twisted)
             'setuptools',
             'vigilo-common',
             'vigilo-connector',
@@ -53,22 +51,26 @@ setup(name='vigilo-connector-metro',
             'twisted',
             ],
         package_data={'twisted': ['plugins/vigilo_metro.py']},
-        entry_points={
-            'console_scripts': [
-                'vigilo-connector-metro = vigilo.connector_metro.main:main',
-                'vigilo-snmpd-metro = vigilo.connector_metro.snmp:main',
-                ],
-            },
+        message_extractors={
+            'src': [
+                ('**.py', 'python', None),
+            ],
+        },
         extras_require={
             'tests': tests_require,
+        },
+        entry_points={
+            'console_scripts': [
+                'vigilo-connector-metro = twisted.scripts.twistd:run',
+                'vigilo-snmpd-metro = vigilo.connector_metro.snmp:main',
+                ],
         },
         package_dir={'': 'src'},
         data_files=[
                     (os.path.join(sysconfdir, "vigilo/connector-metro"),
-                                  ["settings.ini", ]),
+                        ["settings.ini"]),
                     (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
                     (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
-                    (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
                     (os.path.join(localstatedir, "run/vigilo-rrdcached"), []),
                    ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
         )
