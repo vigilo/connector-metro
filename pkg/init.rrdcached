@@ -23,7 +23,7 @@ LOCK_FILE=/var/lock/subsys/$NAME
 
 USER=vigilo-metro
 PID_FILE=/var/run/$NAME/$NAME.pid
-OPTIONS="-m 660 -l /var/lib/vigilo/connector-metro/rrdcached.sock"
+OPTIONS="-m 666 -l /var/lib/vigilo/connector-metro/rrdcached.sock"
 
 if [ -f /etc/sysconfig/$NAME ] ; then
     . /etc/sysconfig/$NAME

@@ -4,4 +4,4 @@
 #USER="vigilo-metro"
 
 # Options par defaut:
-#OPTIONS="-m 660 -l /var/lib/vigilo/connector-metro/rrdcached.sock"
+#OPTIONS="-m 666 -l /var/lib/vigilo/connector-metro/rrdcached.sock"
