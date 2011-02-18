@@ -30,6 +30,7 @@ install_permissions:
 	chown $(USER):$(USER) \
 			$(LOCALSTATEDIR)/lib/vigilo/rrd \
 			$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
+            $(LOCALSTATEDIR)/run/$(PKGNAME) \
 			$(LOCALSTATEDIR)/run/vigilo-rrdcached
 	chmod 755 $(LOCALSTATEDIR)/lib/vigilo/rrd
 

@@ -29,6 +29,9 @@ class NotInConfiguration(KeyError):
 class InvalidMessage(ValueError):
     pass
 
+class WrongMessageType(Exception):
+    pass
+
 class CreationError(Exception):
     pass
 
@@ -130,7 +133,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         if msg.name != 'perf':
             errormsg = _("'%(msgtype)s' is not a valid message type for "
                          "metrology")
-            raise InvalidMessage(errormsg % {'msgtype' : msg.name})
+            return defer.fail(WrongMessageType(errormsg % {'msgtype' : msg.name}))
         perf = {}
         for c in msg.children:
             perf[str(c.name)] = str(c.children[0])
@@ -139,13 +142,13 @@ class NodeToRRDtoolForwarder(PubSubListener):
             if i not in perf:
                 errormsg = _(u"Not a valid performance message (missing "
                               "'%(tag)s' tag)")
-                raise InvalidMessage(errormsg % {"tag": i})
+                return defer.fail(InvalidMessage(errormsg % {"tag": i}))
 
         d = self.confdb.has_host(perf["host"])
         def cb(isinconf, perf):
             if not isinconf:
-                raise NotInConfiguration("Skipping perf update for host %s"
-                                         % perf["host"])
+                return defer.fail(NotInConfiguration("Skipping perf update for host %s"
+                                         % perf["host"]))
             return perf
         d.addCallback(cb, perf)
         return d
@@ -213,10 +216,12 @@ class NodeToRRDtoolForwarder(PubSubListener):
         """
         d = self._parse_message(msg)
         def eb(f):
-            err_class = f.trap(InvalidMessage, NotInConfiguration, CreationError)
+            err_class = f.trap(InvalidMessage, WrongMessageType,
+                               NotInConfiguration, CreationError)
             if err_class == InvalidMessage:
                 LOGGER.error(str(f.value))
-            elif err_class == NotInConfiguration:
+            elif (err_class == NotInConfiguration or
+                  err_class == WrongMessageType):
                 self._messages_forwarded -= 1
                 #LOGGER.debug(str(f.value))
             return None
