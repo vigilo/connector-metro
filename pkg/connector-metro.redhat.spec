@@ -82,7 +82,7 @@ exit 0
 
 %post
 /sbin/chkconfig --add %{name} || :
-%{_libexecdir}/twisted-dropin-cache-%{pybasever} >/dev/null || :
+%{_libexecdir}/twisted-dropin-cache-%{pybasever} >/dev/null 2>&1 || :
 
 %preun
 if [ $1 = 0 ]; then
@@ -94,7 +94,7 @@ fi
 if [ "$1" -ge "1" ] ; then
     /sbin/service %{name} condrestart > /dev/null 2>&1 || :
 fi
-%{_libexecdir}/twisted-dropin-cache-%{pybasever} >/dev/null || :
+%{_libexecdir}/twisted-dropin-cache-%{pybasever} >/dev/null 2>&1 || :
 
 %post -n vigilo-rrdcached
 /sbin/chkconfig --add vigilo-rrdcached || :

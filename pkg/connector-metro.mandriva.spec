@@ -83,13 +83,13 @@ make install_files \
 
 %post
 %_post_service %{name}
-%{_libdir}/twisted-dropin-cache >/dev/null || :
+%{_libdir}/twisted-dropin-cache >/dev/null 2>&1 || :
 
 %preun
 %_preun_service %{name}
 
 %postun
-%{_libdir}/twisted-dropin-cache >/dev/null || :
+%{_libdir}/twisted-dropin-cache >/dev/null 2>&1 || :
 
 %post -n vigilo-rrdcached
 %_post_service vigilo-rrdcached
