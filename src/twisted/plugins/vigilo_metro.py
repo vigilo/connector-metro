@@ -8,7 +8,8 @@ from twisted.application import service
 
 
 from vigilo.common.gettext import translate
-from vigilo.connector import client, options
+from vigilo.connector import client
+from vigilo.connector import options as base_options
 
 _ = translate('vigilo.connector_metro')
 
@@ -19,7 +20,7 @@ class MetroConnectorServiceMaker(object):
     implements(service.IServiceMaker, IPlugin)
     tapname = "vigilo-metro"
     description = "Vigilo connector for performance data"
-    options = options.Options
+    options = base_options.Options
 
     def makeService(self, options):
         """ the service that wraps everything the connector needs. """
