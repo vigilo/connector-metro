@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # vim: set fileencoding=utf-8 sw=4 ts=4 et :
 import os, sys
-from setuptools import setup
+from setuptools import setup, find_packages
 
 sysconfdir = os.getenv("SYSCONFDIR", "/etc")
 localstatedir = os.getenv("LOCALSTATEDIR", "/var")
@@ -45,12 +45,16 @@ setup(name='vigilo-connector-metro',
         namespace_packages = [
             'vigilo',
             ],
-        packages=[
-            'vigilo',
-            'vigilo.connector_metro',
-            'twisted',
-            ],
-        package_data={'twisted': ['plugins/vigilo_metro.py']},
+        packages=find_packages("src")+["twisted"],
+        #packages=[
+        #    'vigilo',
+        #    'vigilo.connector_metro',
+        #    'twisted',
+        #    ],
+        package_data={
+            'twisted': ['plugins/vigilo_metro.py'],
+            'vigilo.connector_metro.test': ["connector-metro.db"],
+        },
         message_extractors={
             'src': [
                 ('**.py', 'python', None),
