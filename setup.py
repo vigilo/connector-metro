@@ -46,11 +46,6 @@ setup(name='vigilo-connector-metro',
             'vigilo',
             ],
         packages=find_packages("src")+["twisted"],
-        #packages=[
-        #    'vigilo',
-        #    'vigilo.connector_metro',
-        #    'twisted',
-        #    ],
         package_data={
             'twisted': ['plugins/vigilo_metro.py'],
             'vigilo.connector_metro.test': ["connector-metro.db"],
