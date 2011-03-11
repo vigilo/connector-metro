@@ -133,7 +133,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
         if msg.name != 'perf':
             errormsg = _("'%(msgtype)s' is not a valid message type for "
                          "metrology")
-            return defer.fail(WrongMessageType(errormsg % {'msgtype' : msg.name}))
+            return defer.fail(WrongMessageType(errormsg
+                                               % {'msgtype' : msg.name}))
         perf = {}
         for c in msg.children:
             perf[str(c.name)] = str(c.children[0])
@@ -147,8 +148,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
         d = self.confdb.has_host(perf["host"])
         def cb(isinconf, perf):
             if not isinconf:
-                return defer.fail(NotInConfiguration("Skipping perf update for host %s"
-                                         % perf["host"]))
+                return defer.fail(NotInConfiguration(
+                        _("Skipping perf update for host %s") % perf["host"])
             return perf
         d.addCallback(cb, perf)
         return d
