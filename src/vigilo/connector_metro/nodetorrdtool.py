@@ -149,7 +149,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
         def cb(isinconf, perf):
             if not isinconf:
                 return defer.fail(NotInConfiguration(
-                        _("Skipping perf update for host %s") % perf["host"])
+                        _("Skipping perf update for host %s") % perf["host"]))
             return perf
         d.addCallback(cb, perf)
         return d
