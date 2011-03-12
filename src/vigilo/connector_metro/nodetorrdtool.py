@@ -80,7 +80,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
 
         @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
             doit être encodé avec urllib.quote_plus (RFC 1738).
-        @type filename: C{str}
+        @type  filename: C{str}
         @param perf: Dictionnaire décrivant la source de données, contenant les
             clés suivantes :
              - C{host}: Nom de l'hôte.
