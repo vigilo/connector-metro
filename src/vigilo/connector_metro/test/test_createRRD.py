@@ -165,6 +165,21 @@ class TestCreateRRDFile(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+    @deferred(timeout=5)
+    def test_special_chars_in_host_name(self):
+        """Caractères spéciaux dans le nom de l'hôte (#454)."""
+        rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
+                               "A+b%2Fc.example.com", "Load.rrd")
+        # on vérifie que le fichier n'existe pas encore
+        # (ce qui lève une exception quand on teste le fichier).
+        self.assertRaises(OSError, os.stat, rrdfile)
+        xml = text2xml("perf|1165939739|A b/c.example.com|Load|42")
+        d = self.ntrf.processMessage(xml)
+        # on vérifie que le fichier correspondant a bien été créé
+        def cb(_):
+            self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
+        d.addCallback(cb)
+        return d
 
 
 if __name__ == "__main__":
