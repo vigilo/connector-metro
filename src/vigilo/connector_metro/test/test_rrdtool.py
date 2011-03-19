@@ -101,7 +101,6 @@ class RRDToolProcessProtocolTest(unittest.TestCase):
     """
 
     def setUp(self):
-        """Initialisation du test."""
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
         settings['connector-metro']['rrd_base_dir'] = \
                 os.path.join(self.tmpdir, "rrds")
@@ -111,7 +110,6 @@ class RRDToolProcessProtocolTest(unittest.TestCase):
         self.process.transport = self.transport
 
     def tearDown(self):
-        """Destruction des objets de test."""
         rmtree(self.tmpdir)
 
     def test_start(self):

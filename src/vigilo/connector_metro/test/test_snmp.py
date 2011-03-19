@@ -262,6 +262,7 @@ class SNMPtoRRDToolTest(unittest.TestCase):
         def pass_result(r, oid):
             return r
         self.snmp.rrdtool_result = pass_result
+        self.snmp.quit = lambda: None # pour éviter de faire un reactor.stop
         # go
         d = self.snmp.get(oid)
         def cb(r):
