@@ -155,6 +155,7 @@ class SNMPtoRRDToolTest(unittest.TestCase):
         settings['connector-metro']['config'] = os.path.join(
                         os.path.dirname(__file__), "connector-metro.db")
         self.snmp = SNMPtoRRDTool()
+        self.snmp.quit = lambda: None # pour éviter de faire un reactor.stop
         self.rrdtool = RRDToolManagerStub()
         self.snmp.rrdtool = self.rrdtool
 
@@ -262,7 +263,6 @@ class SNMPtoRRDToolTest(unittest.TestCase):
         def pass_result(r, oid):
             return r
         self.snmp.rrdtool_result = pass_result
-        self.snmp.quit = lambda: None # pour éviter de faire un reactor.stop
         # go
         d = self.snmp.get(oid)
         def cb(r):
