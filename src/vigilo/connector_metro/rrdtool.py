@@ -53,7 +53,8 @@ class RRDToolManager(object):
             # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
             pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
             if pool_size > 4:
-                pool_size = 4 # on limite, sinon on passe trop de temps à choisir
+                # on limite, sinon on passe trop de temps à choisir
+                pool_size = 4
         self.pool = []
         self._lock = defer.DeferredSemaphore(pool_size)
         self.buildPool(pool_size)
@@ -96,12 +97,12 @@ class RRDToolManager(object):
         rrd_bin = settings['connector-metro']['rrd_bin']
         if not os.path.isfile(rrd_bin):
             raise OSError(_('Unable to start "%(rrdtool)s". Make sure the '
-                            'path is correct.') % {'rrdtool': self.rrdbin})
+                            'path is correct.') % {'rrdtool': rrd_bin})
         if not os.access(rrd_bin, os.X_OK):
             raise OSError(_('Unable to start "%(rrdtool)s". Make sure '
                             'RRDtool is installed and you have '
                             'permissions to use it.') % {
-                                'rrdtool': self.rrdbin,
+                                'rrdtool': rrd_bin,
                             })
 
     def ensureDirectory(self, directory):
@@ -165,7 +166,7 @@ class RRDToolManager(object):
 
 class RRDToolProcessProtocol(protocol.ProcessProtocol):
 
-    def __init__(self, rrd_bin, env={}):
+    def __init__(self, rrd_bin, env=None):
         self.rrd_bin = rrd_bin
         self.deferred = None
         self.deferred_start = None
@@ -173,7 +174,10 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         self._keep_alive = True
         self._filename = None
         self.working = False
-        self.env = env
+        if env is None:
+            self.env = {}
+        else:
+            self.env = env
 
     def start(self):
         if self.transport is not None:

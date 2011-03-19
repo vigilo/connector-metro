@@ -8,7 +8,7 @@ import stat
 import signal
 import urllib
 
-from twisted.internet import task, defer
+from twisted.internet import defer
 
 from vigilo.common.conf import settings
 
@@ -168,7 +168,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
             if os.path.exists(cur_dir):
                 continue
             try:
-                os.mkdir(cur_dir) # l'option 'mode' de mkdir respecte l'umask, dommage
+                os.mkdir(cur_dir)
+                # l'option 'mode' de mkdir respecte l'umask, dommage
                 os.chmod(cur_dir, # chmod 755
                          stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
                          stat.S_IRGRP | stat.S_IXGRP | \
@@ -227,6 +228,11 @@ class NodeToRRDtoolForwarder(PubSubListener):
                 #LOGGER.debug(str(f.value))
             return None
         def create_if_needed(perf):
+            """
+            La création du deferred et le addCallbacks sont là pour propager
+            le message de perf plutôt que le résultat de la fonction
+            create_if_needed
+            """
             d = defer.Deferred()
             create_d = self.create_if_needed(perf)
             create_d.addCallbacks(lambda x: d.callback(perf), d.errback)

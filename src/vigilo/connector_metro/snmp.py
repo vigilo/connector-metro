@@ -21,7 +21,7 @@ import warnings
 
 warnings.filterwarnings('ignore', category=DeprecationWarning,
                         module='^twisted\.')
-from twisted.internet import stdio, reactor, defer, task
+from twisted.internet import stdio, reactor, defer
 from twisted.protocols import basic
 
 from vigilo.common.conf import settings
@@ -33,7 +33,7 @@ LOGGER = get_logger(__name__, silent_load=True)
 for h in LOGGER.parent.handlers:
     if not hasattr(h, "stream"):
         continue
-    if h.stream.name == "<stdout>":
+    if hasattr(h.stream, "name") and h.stream.name == "<stdout>":
         LOGGER.parent.removeHandler(h)
 
 from vigilo.common.gettext import translate
@@ -66,7 +66,7 @@ class SNMPProtocol(basic.LineReceiver):
     def connectionMade(self):
         LOGGER.info(_("Connection to the SNMP daemon established"))
 
-    def connectionLost(self, reason):
+    def connectionLost(self, reason=None):
         LOGGER.info("Connection lost")
         self.parent.quit()
 
@@ -120,11 +120,11 @@ class SNMPProtocol(basic.LineReceiver):
 
     def do_PING(self):
         d = self.parent.start()
-        def pong(pid, self):
+        def pong(pid, self): # pylint: disable-msg=W0613
             self.sendLine("PONG")
         d.addCallback(pong, self)
 
-    def do_set(self, oid, value):
+    def do_set(self, oid, value): # pylint: disable-msg=W0613
         """Non disponible"""
         self.sendLine("not-writable")
 
@@ -139,14 +139,15 @@ class SNMPProtocol(basic.LineReceiver):
         d.addCallback(self.write_result, oid)
         d.addErrback(self.write_error, oid)
 
-    def do_getnext(self, oid):
+    def do_getnext(self, oid): # pylint: disable-msg=W0613
         # On ne fait pas de getnext, trop consommateur
         self.sendLine("NONE")
 
     def write_result(self, result, oid):
         #LOGGER.debug("Sending result: %s" % result)
         self.sendLine(oid)
-        self.sendLine("gauge") # integer, gauge, counter, timeticks, ipaddress, objectid, string
+        # integer, gauge, counter, timeticks, ipaddress, objectid, string
+        self.sendLine("gauge")
         self.sendLine(result)
 
     def write_error(self, error, oid):

@@ -5,9 +5,8 @@ from __future__ import absolute_import
 
 import os
 
-from twisted.internet import defer, threads, task
+from twisted.internet import defer, task
 from twisted.enterprise import adbapi
-from twisted.python.failure import Failure
 
 from vigilo.common.logging import get_logger
 LOGGER = get_logger(__name__)

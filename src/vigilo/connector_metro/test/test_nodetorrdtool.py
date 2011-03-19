@@ -1,17 +1,12 @@
 # -*- coding: utf-8 -*-
 # vim: set et sw=4 ts=4 ai:
-'''
-Created on 14 oct. 2009
+# pylint: disable-msg=R0904,C0111,W0613,W0212
 
-@author: tburguie
-'''
-# Teste la creation d'un fichier RRD
 from __future__ import absolute_import
 
 import tempfile
 import os
 import stat
-from StringIO import StringIO
 from shutil import rmtree
 import unittest
 
@@ -20,49 +15,20 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
-from twisted.internet import defer
-from wokkel.test.helpers import XmlStreamStub
+from vigilo.connector.test.helpers import XmlStreamStub
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
-from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder, \
-                                                 NotInConfiguration
+from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
+from vigilo.connector_metro.nodetorrdtool import NotInConfiguration
+from vigilo.connector_metro.nodetorrdtool import WrongMessageType
+from vigilo.connector_metro.nodetorrdtool import InvalidMessage
 from vigilo.connector.converttoxml import text2xml
 
-from vigilo.connector_metro.rrdtool import RRDToolManager
-
-class RRDToolManagerStub(RRDToolManager):
-    """
-    On a pas le droit de lancer des sous-processus dans un test unitaire, sous
-    peine de les voir se transformer en zombies. Le virus vient de
-    l'intégration de twisted avec nose, parce qu'il lance le réacteur dans un
-    thread, et qu'il n'installe pas les gestionnaires de signaux (SIGCHLD)
-    @see: U{http://twistedmatrix.com/pipermail/twisted-python/2007-February/014782.html}
-    """
-    def __init__(self):
-        self.commands = []
-        super(RRDToolManagerStub, self).__init__()
-
-    def buildPool(self, pool_size):
-        for i in range(pool_size):
-            proc = RRDToolProcessProtocolStub(self.commands)
-            self.pool.append(proc)
-
-class RRDToolProcessProtocolStub(object):
-    def __init__(self, commands):
-        self.working = False
-        self.commands = commands
-    def start(self):
-        return defer.succeed(None)
-    def quit(self):
-        pass
-    def run(self, command, filename, args):
-        self.commands.append((command, filename, args))
-        open(filename, "w").close() # touch filename
-        return defer.succeed("")
+from .helpers import RRDToolManagerStub
 
 
-class TestCreateRRDFile(unittest.TestCase):
+class NodeToRRDtoolForwarderTest(unittest.TestCase):
     """
     Message from BUS forward(XMPP BUS)
     Vérification que le passage d'un message produit bien un fichier RRD.
@@ -91,7 +57,7 @@ class TestCreateRRDFile(unittest.TestCase):
         rmtree(self.tmpdir)
 
 
-    @deferred(timeout=5)
+    @deferred(timeout=30)
     def test_handled_host(self):
         """Prise en compte de messages sur des hôtes déclarés."""
 
@@ -119,7 +85,7 @@ class TestCreateRRDFile(unittest.TestCase):
         d.addCallback(check_update_command)
         return d
 
-    @deferred(timeout=5)
+    @deferred(timeout=30)
     def test_unhandled_host(self):
         """Le connecteur doit ignorer les hôtes non-déclarés."""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
@@ -134,7 +100,7 @@ class TestCreateRRDFile(unittest.TestCase):
             self.assertRaises(OSError, os.stat, rrdfile)
         return d.addCallback(cb)
 
-    @deferred(timeout=5)
+    @deferred(timeout=30)
     def test_non_existing_host(self):
         """Reception d'un message pour un hôte absent du fichier de conf"""
         msg = {"timestamp": "123456789",
@@ -146,10 +112,11 @@ class TestCreateRRDFile(unittest.TestCase):
             if not isinstance(f.value, NotInConfiguration):
                 self.fail("Raised exeception is not of the right type (got %s)"
                           % type(f.value))
-        d.addCallbacks(lambda x: self.fail("No exception raised"), check_failure)
+        d.addCallbacks(lambda x: self.fail("No exception raised"),
+                       check_failure)
         return d
 
-    @deferred(timeout=5)
+    @deferred(timeout=30)
     def test_special_chars_in_pds_name(self):
         """Caractères spéciaux dans le nom de la source de données."""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
@@ -165,7 +132,7 @@ class TestCreateRRDFile(unittest.TestCase):
         d.addCallback(cb)
         return d
 
-    @deferred(timeout=5)
+    @deferred(timeout=30)
     def test_special_chars_in_host_name(self):
         """Caractères spéciaux dans le nom de l'hôte (#454)."""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
@@ -181,6 +148,76 @@ class TestCreateRRDFile(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+    @deferred(timeout=30)
+    def test_wrong_message_type_1(self):
+        """Réception d'un autre message que perf (_parse_message)"""
+        xml = text2xml("event|1165939739|host|service|CRITICAL|message")
+        d = self.ntrf._parse_message(xml)
+        def cb(r):
+            self.fail("Il y aurait dû y avoir un errback")
+        def eb(f):
+            self.assertEqual(f.type, WrongMessageType)
+        d.addCallbacks(cb, eb)
+        return d
 
-if __name__ == "__main__":
-    unittest.main()
+    @deferred(timeout=30)
+    def test_wrong_message_type_2(self):
+        """Réception d'un autre message que perf (processMessage)"""
+        xml = text2xml("event|1165939739|host|service|CRITICAL|message")
+        d = self.ntrf.processMessage(xml)
+        def cb(r):
+            self.assertEqual(len(self.ntrf.rrdtool.commands), 0)
+            self.assertEqual(self.ntrf._messages_forwarded, -1)
+        d.addCallback(cb)
+        return d
+
+    @deferred(timeout=30)
+    def test_invalid_message_1(self):
+        """Réception d'un message invalide (_parse_message)"""
+        xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
+        del xml.children[0]
+        d = self.ntrf._parse_message(xml)
+        def cb(r):
+            self.fail("Il y aurait dû y avoir un errback")
+        def eb(f):
+            self.assertEqual(f.type, InvalidMessage)
+        d.addCallbacks(cb, eb)
+        return d
+
+    @deferred(timeout=30)
+    def test_invalid_message_2(self):
+        """Réception d'un message invalide (processMessage)"""
+        xml = text2xml("perf|1165939739|unknown.example.com|Load|12")
+        del xml.children[0]
+        d = self.ntrf.processMessage(xml)
+        def cb(r):
+            self.assertEqual(len(self.ntrf.rrdtool.commands), 0)
+        d.addCallback(cb)
+        return d
+
+    @deferred(timeout=30)
+    def test_already_created(self):
+        """Pas de création si le fichier existe déjà"""
+        rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
+                               "server1.example.com", "Load.rrd")
+        os.makedirs(os.path.dirname(rrdfile))
+        open(rrdfile, "w").close()
+        msg = {"timestamp": "123456789",
+               "host": "server1.example.com",
+               "datasource": "Load",
+               "value": "42",}
+        d = self.ntrf.create_if_needed(msg)
+        def cb(r):
+            self.assertEqual(len(self.ntrf.rrdtool.commands), 0)
+        d.addCallback(cb)
+        return d
+
+    @deferred(timeout=30)
+    def test_stats(self):
+        """Statistiques"""
+        d = self.ntrf.getStats()
+        def cb(r):
+            self.assertEqual(r, {'queue': 0, 'forwarded': 0, 'pds_count': 3})
+        d.addCallback(cb)
+        return d
+
