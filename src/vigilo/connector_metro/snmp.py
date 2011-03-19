@@ -175,7 +175,6 @@ class SNMPtoRRDTool(object):
         self.confdb = ConfDB(settings['connector-metro']['config'])
         # Interface SNMP
         self.snmp = SNMPProtocol(self)
-        stdio.StandardIO(self.snmp)
 
     def quit(self):
         LOGGER.info(_("SNMP to RRDTool gateway stopped"))
@@ -262,7 +261,9 @@ class SNMPtoRRDTool(object):
 
 
 def main():
-    SNMPtoRRDTool()
+    str = SNMPtoRRDTool()
+    # lancement de la connexion à l'entrée/sortie standard
+    stdio.StandardIO(str.snmp)
     reactor.run()
 
 
