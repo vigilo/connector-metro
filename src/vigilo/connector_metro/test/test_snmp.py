@@ -161,6 +161,7 @@ class SNMPtoRRDToolTest(unittest.TestCase):
 
     def tearDown(self):
         """Destruction des objets de test."""
+        self.snmp.confdb.stop()
         rmtree(self.tmpdir)
 
     def test_oid_to_rrdfile(self):

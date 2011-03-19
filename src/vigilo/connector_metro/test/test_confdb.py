@@ -18,6 +18,7 @@ from twisted.internet import defer
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
+from vigilo.connector.test.helpers import wait
 
 from vigilo.connector_metro.vigiconf_settings import ConfDB, NoConfDBError
 
@@ -27,10 +28,16 @@ class ConfDBTest(unittest.TestCase):
     Gestion du protocole SNMP entre avec le démon
     """
 
+    @deferred(timeout=5)
     def setUp(self):
         dbpath = os.path.join(os.path.dirname(__file__), "connector-metro.db")
         self.confdb = ConfDB(dbpath)
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
+        d = wait(0.1)
+        def stop_task(r):
+            self.confdb._reload_task.stop()
+        d.addCallback(stop_task)
+        return d
 
     def tearDown(self):
         self.confdb.stop()
