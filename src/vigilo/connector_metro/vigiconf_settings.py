@@ -45,7 +45,7 @@ class ConfDB(object):
 
     def start_db(self):
         if not os.path.exists(self.path):
-            LOGGER.warning(_("No configuration database yet !"))
+            LOGGER.warning(_("No configuration database yet!"))
             raise NoConfDBError()
         self._timestamp = os.stat(self.path).st_mtime
         # threads: http://twistedmatrix.com/trac/ticket/3629
@@ -153,4 +153,3 @@ class ConfDB(object):
         result = self._db.runQuery("SELECT COUNT(*) FROM perfdatasource")
         result.addCallback(lambda r: r[0][0])
         return result
-

@@ -211,7 +211,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         """
         self.working = True
         assert self.deferred is None, \
-                _("Le process n'a pas encore fini le job précédent")
+                _("The process has not yet completed the previous job")
         self.deferred = defer.Deferred()
         def state_finish(r):
             self.working = False
@@ -276,5 +276,3 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         # respawn
         LOGGER.info(_('Restarting...'))
         self.start()
-
-
