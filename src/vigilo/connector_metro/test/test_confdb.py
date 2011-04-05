@@ -7,6 +7,7 @@ from __future__ import absolute_import
 import tempfile
 import os
 from shutil import rmtree, copy
+import sqlite3
 import unittest
 
 # ATTENTION: ne pas utiliser twisted.trial, car nose va ignorer les erreurs
@@ -30,9 +31,12 @@ class ConfDBTest(unittest.TestCase):
 
     @deferred(timeout=5)
     def setUp(self):
-        dbpath = os.path.join(os.path.dirname(__file__), "connector-metro.db")
-        self.confdb = ConfDB(dbpath)
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
+        dbpath_orig = os.path.join(os.path.dirname(__file__),
+                                   "connector-metro.db")
+        dbpath = os.path.join(self.tmpdir, "conf.db")
+        copy(dbpath_orig, dbpath)
+        self.confdb = ConfDB(dbpath)
         d = wait(0.1)
         def stop_task(r):
             self.confdb._reload_task.stop()
@@ -48,15 +52,25 @@ class ConfDBTest(unittest.TestCase):
     def test_reload(self):
         """Reconnexion à la base"""
         self.confdb.start_db()
-        yield self.confdb.get_hosts()
+        old_hosts = yield self.confdb.get_hosts()
         old_connection_threads = set(self.confdb._db.connections.keys())
         print self.confdb._db.connections
-        newdb = os.path.join(self.tmpdir, "conf.db")
-        copy(self.confdb.path, newdb)
-        self.confdb.path = newdb
+        # On change le fichier de la base de données
+        dbpath = os.path.join(self.tmpdir, "conf.db")
+        os.rename(dbpath, dbpath + ".orig.db")
+        copy(dbpath + ".orig.db", dbpath)
+        # On modifie la base de données
+        conn = sqlite3.connect(dbpath)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM perfdatasource")
+        conn.commit()
+        cursor.close()
+        # Reload et test
         self.confdb.reload()
-        yield self.confdb.get_hosts()
+        new_hosts = yield self.confdb.get_hosts()
         new_connection_threads = set(self.confdb._db.connections.keys())
+        print self.confdb._db.connections
+        self.assertNotEqual(len(old_hosts), len(new_hosts))
         self.assertNotEqual(old_connection_threads, new_connection_threads)
 
     @deferred(timeout=30)
@@ -73,12 +87,12 @@ class ConfDBTest(unittest.TestCase):
 
     def test_nodb(self):
         """La base n'existe pas"""
-        confdb = ConfDB(os.path.join(self.tmpdir, "conf.db"))
+        confdb = ConfDB(os.path.join(self.tmpdir, "nonexistant.db"))
         self.assertRaises(NoConfDBError, confdb.start_db)
 
     def test_reload_nodb(self):
         """Rechargement alors que la base n'existe pas"""
-        confdb = ConfDB(os.path.join(self.tmpdir, "conf.db"))
+        confdb = ConfDB(os.path.join(self.tmpdir, "nonexistant.db"))
         self.assertEqual(confdb.reload(), None)
 
 
