@@ -53,8 +53,6 @@ class ConfDBTest(unittest.TestCase):
         """Reconnexion à la base"""
         self.confdb.start_db()
         old_hosts = yield self.confdb.get_hosts()
-        old_connection_threads = set(self.confdb._db.connections.keys())
-        print self.confdb._db.connections
         # On change le fichier de la base de données
         dbpath = os.path.join(self.tmpdir, "conf.db")
         os.rename(dbpath, dbpath + ".orig.db")
@@ -68,10 +66,7 @@ class ConfDBTest(unittest.TestCase):
         # Reload et test
         self.confdb.reload()
         new_hosts = yield self.confdb.get_hosts()
-        new_connection_threads = set(self.confdb._db.connections.keys())
-        print self.confdb._db.connections
         self.assertNotEqual(len(old_hosts), len(new_hosts))
-        self.assertNotEqual(old_connection_threads, new_connection_threads)
 
     @deferred(timeout=30)
     @defer.inlineCallbacks
