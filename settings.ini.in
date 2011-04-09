@@ -82,8 +82,9 @@ backup_table_from_bus = frombus
 #status_node = /vigilo/connectors-status
 
 # La taille maximum de la file d'attente mémoire, à partir de laquelle le
-# connecteur indique au bus de ne plus lui envoyer de messages. La valeur
-# par défaut est 0, ce qui désactive cette vérification.
+# connecteur indique au bus de ne plus lui envoyer de messages.
+# Une limite à 50000 correspond à environ 1Go de RAM utilisé.
+# La valeur par défaut est 0, ce qui désactive cette vérification.
 #max_queue_size = 0
 
 
