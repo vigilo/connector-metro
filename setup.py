@@ -32,11 +32,10 @@ setup(name='vigilo-connector-metro',
         author='Vigilo Team',
         author_email='contact@projet-vigilo.org',
         url='http://www.projet-vigilo.org/',
-        description='vigilo metrology connector component',
+        description="Vigilo Metrology connector",
         license='http://www.gnu.org/licenses/gpl-2.0.html',
-        long_description='The vigilo metrology connector component is a connector between:\n'
-        +'   - XMPP/PubSub message bus\n'
-        +'   - RRDtool\n',
+        long_description="Gateway from the Vigilo message bus (XMPP) "
+                         "to RRD files.",
         install_requires=[
             'setuptools',
             'vigilo-common',

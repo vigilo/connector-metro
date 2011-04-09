@@ -1,14 +1,11 @@
-%define module  connector-metro
-%define name    vigilo-%{module}
-%define version 2.0.0
-%define release 1%{?svn}%{?dist}
+%define module  @SHORT_NAME@
 
-Name:       %{name}
-Summary:    Vigilo Metrology connector
-Version:    %{version}
-Release:    %{release}
+Name:       vigilo-%{module}
+Summary:    @SUMMARY@
+Version:    @VERSION@
+Release:    1%{?svn}%{?dist}
 Source0:    %{name}-%{version}.tar.gz
-URL:        http://www.projet-vigilo.org
+URL:        @URL@
 Group:      System/Servers
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
 License:    GPLv2
@@ -44,7 +41,7 @@ Obsoletes:  %{name}-vigiconf < 2.0.0-1.svn5779
 Provides:   %{name}-vigiconf = %{version}-%{release}
 
 %description
-Gateway from the Vigilo message bus (XMPP) to RRD files.
+@DESCRIPTION@
 This application is part of the Vigilo Project <http://vigilo-project.org>
 
 %package    -n vigilo-rrdcached
