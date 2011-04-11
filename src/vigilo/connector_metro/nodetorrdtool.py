@@ -109,8 +109,8 @@ class NodeToRRDtoolForwarder(PubSubListener):
         rrd_cmd = ["--step", str(ds["step"]), "--start", str(timestamp)]
         rras = yield self.confdb.get_rras(ds["id"])
         for rra in rras:
-            rrd_cmd.append("RRA:%s:%s:%s:%s" % \
-                           (rra["type"], rra["xff"], \
+            rrd_cmd.append("RRA:%s:%s:%s:%s" %
+                           (rra["type"], rra["xff"],
                             rra["step"], rra["rows"]))
 
         rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
@@ -126,7 +126,7 @@ class NodeToRRDtoolForwarder(PubSubListener):
             raise CreationError()
         else:
             os.chmod(filename, # chmod 644
-                     stat.S_IRUSR | stat.S_IWUSR | \
+                     stat.S_IRUSR | stat.S_IWUSR |
                      stat.S_IRGRP | stat.S_IROTH )
 
     def _parse_message(self, msg):
