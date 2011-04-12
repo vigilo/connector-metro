@@ -10,11 +10,15 @@ PKGNAME := vigilo-connector-metro
 settings.ini: settings.ini.in
 	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
 
-install: install_files install_permissions
+install: install_python install_data install_permissions
+install_pkg: install_python_pkg install_data
 
-install_files: settings.ini $(PYTHON)
-	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR) --record=INSTALLED_FILES
-	chmod a+rX -R $(DESTDIR)$(PREFIX)/lib*/python*/*
+install_python: settings.ini $(PYTHON)
+	$(PYTHON) setup.py install --root=$(DESTDIR) --record=INSTALLED_FILES
+install_python_pkg: settings.ini $(PYTHON)
+	$(PYTHON) setup.py install --single-version-externally-managed --root=$(DESTDIR)
+
+install_data: pkg/init pkg/initconf pkg/init.rrdcached pkg/initconf.rrdcached
 	# init
 	install -p -m 755 -D pkg/init $(DESTDIR)/etc/rc.d/init.d/$(PKGNAME)
 	echo /etc/rc.d/init.d/$(PKGNAME) >> INSTALLED_FILES
@@ -28,14 +32,16 @@ install_files: settings.ini $(PYTHON)
 
 install_permissions:
 	chown $(USER):$(USER) \
-			$(LOCALSTATEDIR)/lib/vigilo/rrd \
-			$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
-            $(LOCALSTATEDIR)/run/$(PKGNAME) \
-			$(LOCALSTATEDIR)/run/vigilo-rrdcached
-	chmod 755 $(LOCALSTATEDIR)/lib/vigilo/rrd
+			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd \
+			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
+            $(DESTDIR)$(LOCALSTATEDIR)/run/$(PKGNAME) \
+			$(DESTDIR)$(LOCALSTATEDIR)/run/vigilo-rrdcached
+	chmod 755 $(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd
 
 clean: clean_python
 	rm -f settings.ini
 
 lint: lint_pylint
 tests: tests_nose
+
+.PHONY: install_pkg install_python install_python_pkg install_data install_permissions
