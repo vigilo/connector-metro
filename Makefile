@@ -10,8 +10,8 @@ PKGNAME := vigilo-connector-metro
 settings.ini: settings.ini.in
 	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
 
-install: install_python install_data install_permissions
-install_pkg: install_python_pkg install_data
+install: build install_python install_data install_permissions
+install_pkg: build install_python_pkg install_data
 
 install_python: settings.ini $(PYTHON)
 	$(PYTHON) setup.py install --record=INSTALLED_FILES
