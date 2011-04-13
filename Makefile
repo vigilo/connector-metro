@@ -31,12 +31,19 @@ install_data: pkg/init pkg/initconf pkg/init.rrdcached pkg/initconf.rrdcached
 	echo $(INITCONFDIR)/vigilo-rrdcached >> INSTALLED_FILES
 
 install_permissions:
+	@echo "Creating the $(USER) user..."
+	-/usr/sbin/groupadd $(USER)
+	-/usr/sbin/useradd -s /sbin/nologin -M -g $(USER) \
+		-d $(LOCALSTATEDIR)/lib/vigilo/rrd \
+		-c 'Vigilo connector-metro user' $(USER)
 	chown $(USER):$(USER) \
 			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd \
 			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
             $(DESTDIR)$(LOCALSTATEDIR)/run/$(PKGNAME) \
 			$(DESTDIR)$(LOCALSTATEDIR)/run/vigilo-rrdcached
 	chmod 755 $(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd
+	chown root:$(USER) $(DESTDIR)$(SYSCONFDIR)/vigilo/$(NAME)/settings.ini
+	chmod 640 $(DESTDIR)$(SYSCONFDIR)/vigilo/$(NAME)/settings.ini
 
 clean: clean_python
 	rm -f settings.ini
