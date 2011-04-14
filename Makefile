@@ -1,6 +1,5 @@
 NAME := connector-metro
 USER := vigilo-metro
-EPYDOC_PARSE := vigilo\.connector_metro\.nodetorrdtool
 
 all: build settings.ini
 

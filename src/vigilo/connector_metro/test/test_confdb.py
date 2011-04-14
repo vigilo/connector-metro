@@ -63,6 +63,7 @@ class ConfDBTest(unittest.TestCase):
         cursor.execute("DELETE FROM perfdatasource")
         conn.commit()
         cursor.close()
+        conn.close()
         # Reload et test
         self.confdb.reload()
         new_hosts = yield self.confdb.get_hosts()
