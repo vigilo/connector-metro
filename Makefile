@@ -38,7 +38,7 @@ install_permissions:
 	chown $(USER):$(USER) \
 			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd \
 			$(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/$(NAME) \
-            $(DESTDIR)$(LOCALSTATEDIR)/run/$(PKGNAME) \
+			$(DESTDIR)$(LOCALSTATEDIR)/run/$(PKGNAME) \
 			$(DESTDIR)$(LOCALSTATEDIR)/run/vigilo-rrdcached
 	chmod 755 $(DESTDIR)$(LOCALSTATEDIR)/lib/vigilo/rrd
 	chown root:$(USER) $(DESTDIR)$(SYSCONFDIR)/vigilo/$(NAME)/settings.ini
