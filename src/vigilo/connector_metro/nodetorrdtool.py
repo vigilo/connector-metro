@@ -8,19 +8,26 @@ depuis un bus XMPP pour les stocker dans une base de données RRDtool.
 """
 import os
 import stat
+import time
 import signal
 import urllib
 
+from lxml import etree
 from twisted.internet import defer
+from wokkel.generic import parseXml
 
 from vigilo.common.conf import settings
+from vigilo.pubsub.xml import NS_COMMAND
 
 from vigilo.common.logging import get_logger
 from vigilo.common.gettext import translate
-from vigilo.connector.forwarder import PubSubListener
 from vigilo.common import get_rrd_path
+
+from vigilo.connector.forwarder import PubSubListener, PubSubSender
+from vigilo.connector import MESSAGEONETOONE
 from vigilo.connector_metro.rrdtool import RRDToolManager, RRDToolError
 from vigilo.connector_metro.vigiconf_settings import ConfDB
+from vigilo.connector_metro.threshold import is_out_of_bounds
 
 LOGGER = get_logger(__name__)
 _ = translate(__name__)
@@ -38,11 +45,12 @@ class WrongMessageType(Exception):
 class CreationError(Exception):
     pass
 
-class NodeToRRDtoolForwarder(PubSubListener):
+class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
     """
+    get_current_time = time.time
 
     def __init__(self, confdb_path):
         """
@@ -220,48 +228,145 @@ class NodeToRRDtoolForwarder(PubSubListener):
         @type msg: C{twisted.words.test.domish Xml}
         """
         d = self._parse_message(msg)
-        def eb(f):
-            err_class = f.trap(InvalidMessage, WrongMessageType,
-                               NotInConfiguration, CreationError)
-            if err_class == InvalidMessage:
-                LOGGER.error(str(f.value))
-            elif (err_class == NotInConfiguration or
-                  err_class == WrongMessageType):
-                self._messages_forwarded -= 1
-                #LOGGER.debug(str(f.value))
-            return None
-        def create_if_needed(perf):
-            """
-            La création du deferred et le addCallbacks sont là pour propager
-            le message de perf plutôt que le résultat de la fonction
-            create_if_needed
-            """
-            d = defer.Deferred()
-            create_d = self.create_if_needed(perf)
-            create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
-            return d
-        d.addCallbacks(create_if_needed, eb)
-
-        def run_rrdtool(perf):
-            if perf is None:
-                return None
-            cmd = '%(timestamp)s:%(value)s' % perf
-            filename = self._get_msg_filename(perf)
-            basedir = os.path.dirname(filename)
-            self._makedirs(basedir)
-            return self.rrdtool.run("update", filename, cmd)
-        d.addCallbacks(run_rrdtool, eb)
-
-        def eb_rrdtool(f):
-            f.trap(RRDToolError)
-            LOGGER.error(_("RRDtool could not update the file %(filename)s. "
-                           "Message: %(msg)s"), {
-                         'filename': f.value.filename,
-                         'msg': f.getErrorMessage() })
-        d.addErrback(eb_rrdtool)
-
+        d.addCallbacks(self._create_if_needed, self._eb)
+        d.addCallbacks(self._run_rrdtool, self._eb)
+        d.addErrback(self._eb_rrdtool)
+        d.addCallback(self._get_ds)
         return d
 
+    def _eb(self, f):
+        err_class = f.trap(InvalidMessage, WrongMessageType,
+                           NotInConfiguration, CreationError)
+        if err_class == InvalidMessage:
+            LOGGER.error(str(f.value))
+        elif (err_class == NotInConfiguration or
+              err_class == WrongMessageType):
+            self._messages_forwarded -= 1
+            #LOGGER.debug(str(f.value))
+        return None
+
+    def _create_if_needed(self, perf):
+        """
+        La création du deferred et le addCallbacks sont là pour propager
+        le message de perf plutôt que le résultat de la fonction
+        create_if_needed
+        """
+        d = defer.Deferred()
+        create_d = self.create_if_needed(perf)
+        create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
+        return d
+
+    def _run_rrdtool(self, perf):
+        if perf is None:
+            return None
+        cmd = '%(timestamp)s:%(value)s' % perf
+        filename = self._get_msg_filename(perf)
+        basedir = os.path.dirname(filename)
+        self._makedirs(basedir)
+        d2 = self.rrdtool.run("update", filename, cmd)
+        d2.addCallback(lambda x: perf)
+        return d2
+
+    def _eb_rrdtool(self, f):
+        f.trap(RRDToolError)
+        LOGGER.error(_("RRDtool could not update the file %(filename)s. "
+                       "Message: %(msg)s"), {
+                     'filename': f.value.filename,
+                     'msg': f.getErrorMessage() })
+
+    def _get_ds(self, perf):
+        if perf is None:
+            return None
+        ds = self.confdb.get_datasource(perf["host"], perf["datasource"])
+        ds.addCallback(self._has_threshold, perf)
+        return ds
+
+    def _has_threshold(self, ds, perf):
+        attrs = [
+            'warning_threshold',
+            'critical_threshold',
+            'nagiosname',
+            'jid',
+        ]
+
+        # S'il n'y a pas de seuil sur cette source de données,
+        # inutile d'aller plus loin.
+        for attr in attrs:
+            if ds[attr] is None:
+                return
+
+        filename = self._get_msg_filename(perf)
+        last = self.rrdtool.run("lastupdate", filename, '')
+        last.addCallback(self._check_thresholds, ds, perf['host'])
+        return last
+
+    def _check_thresholds(self, last, ds, host):
+        # Modèle pour la commande à envoyer à Nagios.
+        tpl =   u'<%(onetoone)s to="%(recipient)s">'\
+                '<command xmlns="%(namespace)s">'\
+                    '<timestamp>%(timestamp)f</timestamp>'\
+                    '<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>'\
+                    '<value>%(host)s;%(service)s;%(state)d;%(msg)s</value>'\
+                '</command>'\
+                '</%(onetoone)s>'
+
+        # Substitutions pour le template.
+        params = {
+            'namespace': NS_COMMAND,
+            'timestamp': self.get_current_time(),
+            'host': host,
+            'service': ds['nagiosname'],
+            'onetoone': MESSAGEONETOONE,
+            'recipient': ds['jid'],
+        }
+
+        def msg_sent(_dummy):
+            self._messages_sent += 1
+
+        # La réponse de rrdtool est de la forme " DS\n\ntimestamp: value\n"
+        # en cas de succès et "" en cas d'erreur.
+        # On s'arrange pour récupérer uniquement la valeur.
+        if not last:
+            return
+
+        last = last.split(':', 2)[1].strip()
+        if last == 'U' or not last:
+            return
+
+        last = float(last)
+        last *= float(ds['factor'])
+
+        # Si la dernière valeur est entière,
+        # on la représente comme telle.
+        if int(last) == last:
+            last = int(last)
+
+        try:
+            if is_out_of_bounds(last, ds['critical_threshold']):
+                params['state'] = 2 # CRITICAL dans Nagios
+                params['msg'] = 'CRITICAL: %s' % last
+        except ValueError:
+            # La définition de seuils donnée était invalide.
+            params['state'] = 3 # UNKNOWN dans Nagios
+            params['msg'] = 'UNKNOWN: Invalid critical threshold ' \
+                            'specification (%r)' % ds['critical_threshold']
+
+        if 'state' not in params:
+            try:
+                if is_out_of_bounds(last, ds['warning_threshold']):
+                    params['state'] = 1 # WARNING dans Nagios
+                    params['msg'] = 'WARNING: %s' % last
+                else:
+                    params['state'] = 0 # OK dans Nagios
+                    params['msg'] = 'OK: %s' % last
+            except ValueError:
+                # La définition de seuils donnée était invalide.
+                params['state'] = 3 # UNKNOWN dans Nagios
+                params['msg'] = 'UNKNOWN: Invalid warning threshold ' \
+                                'specification (%r)' % ds['warning_threshold']
+
+        sent = self.sendItem(tpl % params)
+        sent.addCallback(msg_sent)
 
     def _sighup_handler(self, signum, frames):
         """
@@ -295,4 +400,14 @@ class NodeToRRDtoolForwarder(PubSubListener):
             self._task_process_queue.stop()
         self.confdb.stop()
         self.rrdtool.stop()
+
+    def sendItem(self, item):
+        if not isinstance(item, etree.ElementBase):
+            item = parseXml(item.encode('utf-8'))
+        if item.name == MESSAGEONETOONE:
+            self.sendOneToOneXml(item)
+            return defer.succeed(None)
+        else:
+            result = self.publishXml(item)
+            return result
 

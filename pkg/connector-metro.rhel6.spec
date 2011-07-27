@@ -15,6 +15,7 @@ BuildRequires:   python-distribute
 BuildRequires:   python-babel
 
 Requires:   python-distribute
+Requires:   python-lxml
 Requires:   vigilo-common vigilo-connector
 Requires:   rrdtool
 Requires:   sqlite >= 3

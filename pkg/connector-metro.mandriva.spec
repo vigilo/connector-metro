@@ -31,6 +31,7 @@ Requires:   python-zope-interface
 Requires:   python-setuptools
 Requires:   python-twisted
 Requires:   python-wokkel
+Requires:   python-lxml
 
 Requires(pre): rpm-helper
 

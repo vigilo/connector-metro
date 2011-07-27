@@ -17,6 +17,8 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
+from twisted.words.protocols.jabber.jid import JID
+from twisted.internet import defer
 from vigilo.connector.test.helpers import XmlStreamStub
 
 from vigilo.common.conf import settings
@@ -26,6 +28,7 @@ from vigilo.connector_metro.nodetorrdtool import NotInConfiguration
 from vigilo.connector_metro.nodetorrdtool import WrongMessageType
 from vigilo.connector_metro.nodetorrdtool import InvalidMessage
 from vigilo.connector.converttoxml import text2xml
+from vigilo.pubsub.xml import NS_COMMAND
 
 from .helpers import RRDToolManagerStub
 
@@ -49,6 +52,8 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         self.ntrf = NodeToRRDtoolForwarder(os.path.join(
                         os.path.dirname(__file__), "connector-metro.db"))
         self.ntrf.xmlstream = self.stub.xmlstream
+        self.ntrf.parent = self
+        self.jid = JID('foo@bar')
         self.rrdtool = RRDToolManagerStub()
         self.ntrf.rrdtool = self.rrdtool
         self.ntrf.connectionInitialized()
@@ -219,7 +224,56 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         """Statistiques"""
         d = self.ntrf.getStats()
         def cb(r):
-            self.assertEqual(r, {'queue': 0, 'forwarded': 0, 'pds_count': 3})
+            self.assertEqual(r, {
+                'queue': 0,
+                'forwarded': 0,
+                'pds_count': 3,
+                'sent': 0,
+            })
         d.addCallback(cb)
+        return d
+
+    @deferred(timeout=30)
+    def test_alerts(self):
+        """Alertes sur dépassement de seuils"""
+        # Positionne l'heure courante à "42" (timestamp UNIX) systématiquement.
+        self.ntrf.get_current_time = lambda: 42
+
+        res_tpl = \
+            "<message to='foo@bar' from='foo@bar' type='chat'><body>" \
+            "<command xmlns='%s'>" \
+                "<timestamp>42.000000</timestamp>" \
+                "<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>" \
+                "<value>server1.example.com;MetroLoad" \
+                    ";%%(state)d;%%(msg)s</value>" \
+            "</command>" \
+            "</body></message>" % NS_COMMAND
+        testdata = {
+            '0.80': res_tpl % {'state': 0, 'msg': 'OK: 0.8'},
+            '0.81': res_tpl % {'state': 1, 'msg': 'WARNING: 0.81'},
+            '0.91': res_tpl % {'state': 2, 'msg': 'CRITICAL: 0.91'},
+            'U': res_tpl % {'state': 3, 'msg': 'UNKNOWN'},
+        }
+
+        def check_result(dummy, value, result):
+            print "Checking results for value %r" % value
+            print [el.toXml() for el in self.stub.output]
+
+            # Une valeur UNKNOWN ne doit pas générer d'alerte
+            # (on utilise la direction freshness_threshold de Nagios).
+            if value == 'U':
+                self.assertEquals(0, len(self.stub.output))
+            # Pour les autres, on vérifie l'alerte générée.
+            else:
+                self.assertEquals(result, self.stub.output[-1].toXml())
+            return None
+
+        d = defer.succeed(None)
+        tpl = "perf|1165939739|server1.example.com|Load|%s"
+        for value, result in testdata.iteritems():
+            d.addCallback(lambda x, value: \
+                self.ntrf.processMessage(text2xml(tpl % value)), value)
+            d.addCallback(check_result, value, result)
+
         return d
 

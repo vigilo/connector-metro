@@ -38,8 +38,16 @@ class RRDToolProcessProtocolStub(object):
         pass
     def run(self, command, filename, args):
         self.commands.append((command, filename, args))
+        print "Running: %s on %s with %r" % (command, filename, args)
         open(filename, "w").close() # touch filename
-        return defer.succeed("")
+        res = ""
+        # @FIXME: Il faudrait probablement définir un autre objet stub.
+        if command == 'lastupdate' and len(self.commands) > 1:
+            # La commande précédente était une mise à jour,
+            # et la valeur se trouve dans les arguments.
+            last_value = self.commands[-2][2].split(':', 2)[1]
+            res = " DS\n\n42: %s\n" % last_value
+        return defer.succeed(res)
 
 class TransportStub(StringIO):
     pid = 42

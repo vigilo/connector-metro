@@ -110,7 +110,10 @@ class ConfDB(object):
 
     def get_datasource(self, hostname, dsname):
         properties = ["id", "type", "step", "heartbeat",
-                      "min", "max"]
+                      "min", "max",
+                      "factor",
+                      "warning_threshold", "critical_threshold",
+                      "nagiosname", "jid"]
         if self._db is None:
             return defer.succeed(dict([(p, None) for p in properties]))
         result = self._db.runQuery(

@@ -44,6 +44,7 @@ setup(name='vigilo-connector-metro',
             'setuptools',
             'vigilo-common',
             'vigilo-connector',
+            'lxml',
             ],
         namespace_packages = [
             'vigilo',
@@ -64,8 +65,7 @@ setup(name='vigilo-connector-metro',
         entry_points={
             'console_scripts': [
                 'vigilo-connector-metro = twisted.scripts.twistd:run',
-                'vigilo-snmpd-metro = vigilo.connector_metro.snmp:main',
-                ],
+            ],
         },
         package_dir={'': 'src'},
         data_files=[
