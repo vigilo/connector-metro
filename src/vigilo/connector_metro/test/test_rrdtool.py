@@ -180,7 +180,7 @@ class RRDToolProcessProtocolTest(unittest.TestCase):
         def eb(f):
             self.assertEqual(f.type, RRDToolError)
             self.assertEqual(f.value.filename, "dummy_filename")
-            self.assertEqual(f.value.message, "dummy error")
+            self.assertEqual(f.value.args[0], "dummy error")
         d.addCallbacks(cb, eb)
         for output in fake_output:
             self.process.outReceived(output+"\n")
