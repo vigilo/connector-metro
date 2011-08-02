@@ -33,7 +33,7 @@ class ConfDB(object):
         self._db = None
         self._timestamp = 0
         self._reload_task = task.LoopingCall(self.reload)
-        self._cache = {"hosts": None}
+        self._cache = {"hosts": None, "has_threshold": None}
         self.start()
 
     def start(self):
@@ -57,6 +57,7 @@ class ConfDB(object):
         LOGGER.debug("Connected to the configuration database")
         # mise en cache de la liste des hôtes
         self.get_hosts()
+        self.list_thresholds()
 
     def reload(self):
         """
@@ -76,7 +77,9 @@ class ConfDB(object):
         self._timestamp = current_timestamp
         # mise en cache de la liste des hôtes
         self._cache["hosts"] = None
+        self._cache["has_threshold"] = None
         self.get_hosts()
+        self.list_thresholds()
 
     def get_hosts(self):
         if self._db is None:
@@ -88,6 +91,19 @@ class ConfDB(object):
             self._cache["hosts"] = hosts
             return hosts
         result.addCallback(cache_hosts)
+        return result
+
+    def list_thresholds(self):
+        if self._db is None:
+            return defer.succeed(None)
+        result = self._db.runQuery("SELECT hostname, name FROM perfdatasource "
+                                   "WHERE warning_threshold IS NOT NULL "
+                                   "AND critical_threshold IS NOT NULL")
+        result.addCallback(lambda results: [(r[0], r[1]) for r in results])
+        def cache_thresholds(thresholds):
+            self._cache["has_threshold"] = thresholds
+            return thresholds
+        result.addCallback(cache_thresholds)
         return result
 
     def has_host(self, hostname):
@@ -111,12 +127,16 @@ class ConfDB(object):
     def has_threshold(self, hostname, dsname):
         if self._db is None:
             return defer.succeed(False)
-        result = self._db.runQuery("SELECT COUNT(*) FROM perfdatasource "
+        if self._cache["has_threshold"] is not None:
+            return defer.succeed((hostname, dsname)
+                                 in self._cache["has_threshold"])
+        result = self._db.runQuery("SELECT 1 FROM perfdatasource "
                                    "WHERE hostname = ? AND name = ? "
                                    "AND (warning_threshold IS NOT NULL "
-                                   "     AND critical_threshold IS NOT NULL)",
-                                   (hostname, dsname) )
-        result.addCallback(lambda results: bool(results[0][0]))
+                                   "     AND critical_threshold IS NOT NULL) "
+                                   "LIMIT 1",
+                                   (hostname, dsname))
+        result.addCallback(lambda results: bool(len(results)))
         return result
 
     def get_datasource(self, hostname, dsname):
