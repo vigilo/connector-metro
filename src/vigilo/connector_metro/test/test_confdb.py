@@ -66,6 +66,8 @@ class ConfDBTest(unittest.TestCase):
         conn.commit()
         cursor.close()
         conn.close()
+        # On désactive la vérification du timestamp
+        self.confdb._timestamp = 1
         # Reload et test
         self.confdb.reload()
         new_hosts = yield self.confdb.get_hosts()
