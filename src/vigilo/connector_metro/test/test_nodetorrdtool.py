@@ -17,6 +17,8 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
+from mock import Mock
+
 from twisted.words.protocols.jabber.jid import JID
 from twisted.internet import defer
 from vigilo.connector.test.helpers import XmlStreamStub
@@ -275,5 +277,17 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
                 self.ntrf.processMessage(text2xml(tpl % value)), value)
             d.addCallback(check_result, value, result)
 
+        return d
+
+    @deferred(timeout=30)
+    def test_handled_host(self):
+        """Désactivation de la vérification des seuils"""
+        xml = text2xml("perf|1165939739|server1.example.com|Load|12")
+        self.ntrf.must_check_thresholds = False
+        self.ntrf._check_thresholds = Mock()
+        d = self.ntrf.processMessage(xml)
+        def check_not_called(_r):
+            self.assertFalse(self.ntrf._check_thresholds.called)
+        d.addCallback(check_not_called)
         return d
 

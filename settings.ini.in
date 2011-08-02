@@ -29,6 +29,10 @@ rrd_bin = /usr/bin/rrdtool
 # Utilisation du démon de mise à jour RRDCacheD. Nécessite RRDTool >= 1.4
 #rrdcached = @LOCALSTATEDIR@/lib/vigilo/connector-metro/rrdcached.sock
 
+# Vérifier les seuils des indicateurs concernés. À désactiver s'il s'agit d'une
+# instance de connector-metro dédiée à la sauvegarde. Par défaut: True
+#check_thresholds = True
+
 
 [bus]
 # Nom ou adresse IP du serveur XMPP à utiliser.

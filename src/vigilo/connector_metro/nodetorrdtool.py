@@ -64,6 +64,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
 
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
+        try:
+            self.must_check_thresholds = settings['connector-metro'].as_bool('check_threshold')
+        except KeyError:
+            self.must_check_thresholds = True
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
@@ -231,7 +235,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         d.addCallbacks(self._create_if_needed, self._eb)
         d.addCallbacks(self._run_rrdtool, self._eb)
         d.addErrback(self._eb_rrdtool)
-        d.addCallback(self._check_thresholds)
+        if self.must_check_thresholds:
+            d.addCallback(self._check_thresholds)
         return d
 
     def _eb(self, f):
