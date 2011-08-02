@@ -231,7 +231,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         d.addCallbacks(self._create_if_needed, self._eb)
         d.addCallbacks(self._run_rrdtool, self._eb)
         d.addErrback(self._eb_rrdtool)
-        d.addCallback(self._get_ds)
+        d.addCallback(self._check_thresholds)
         return d
 
     def _eb(self, f):
@@ -274,33 +274,38 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                      'filename': f.value.filename,
                      'msg': f.getErrorMessage() })
 
-    def _get_ds(self, perf):
+    def _check_thresholds(self, perf):
         if perf is None:
             return None
+        d = self.confdb.has_threshold(perf["host"], perf["datasource"])
+        d.addCallback(self._checked_has_threshold, perf)
+        return d
+
+    def _checked_has_threshold(self, has_th, perf):
+        if not has_th:
+            return None
         ds = self.confdb.get_datasource(perf["host"], perf["datasource"])
-        ds.addCallback(self._has_threshold, perf)
+        ds.addCallback(self._get_last_value, perf)
         return ds
 
-    def _has_threshold(self, ds, perf):
+    def _get_last_value(self, ds, perf):
+        # simple précaution, redondant avec self.confdb.has_threshold
         attrs = [
             'warning_threshold',
             'critical_threshold',
             'nagiosname',
             'jid',
         ]
-
-        # S'il n'y a pas de seuil sur cette source de données,
-        # inutile d'aller plus loin.
         for attr in attrs:
             if ds[attr] is None:
                 return
-
+        # récupération de la dernière valeur enregistrée
         filename = self._get_msg_filename(perf)
         last = self.rrdtool.run("lastupdate", filename, '')
-        last.addCallback(self._check_thresholds, ds, perf['host'])
+        last.addCallback(self._compare_thresholds, ds, perf['host'])
         return last
 
-    def _check_thresholds(self, last, ds, host):
+    def _compare_thresholds(self, last, ds, host):
         # Modèle pour la commande à envoyer à Nagios.
         tpl =   u'<%(onetoone)s to="%(recipient)s">'\
                 '<command xmlns="%(namespace)s">'\
@@ -320,20 +325,17 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             'recipient': ds['jid'],
         }
 
-        def msg_sent(_dummy):
-            self._messages_sent += 1
-
         # La réponse de rrdtool est de la forme " DS\n\ntimestamp: value\n"
         # en cas de succès et "" en cas d'erreur.
         # On s'arrange pour récupérer uniquement la valeur.
         if not last:
             return
 
-        last = last.split(':', 2)[1].strip()
+        last = last.split(':', 1)[1].strip()
         if last == 'U' or not last:
             return
 
-        last = float(last)
+        last = float(last) # python convertit tout seul la notation exposant
         last *= float(ds['factor'])
 
         # Si la dernière valeur est entière,
@@ -345,28 +347,18 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             if is_out_of_bounds(last, ds['critical_threshold']):
                 params['state'] = 2 # CRITICAL dans Nagios
                 params['msg'] = 'CRITICAL: %s' % last
-        except ValueError:
-            # La définition de seuils donnée était invalide.
+            elif is_out_of_bounds(last, ds['warning_threshold']):
+                params['state'] = 1 # WARNING dans Nagios
+                params['msg'] = 'WARNING: %s' % last
+            else:
+                params['state'] = 0 # OK dans Nagios
+                params['msg'] = 'OK: %s' % last
+        except ValueError, e:
+            # Le seuil configuré est invalide.
             params['state'] = 3 # UNKNOWN dans Nagios
-            params['msg'] = 'UNKNOWN: Invalid critical threshold ' \
-                            'specification (%r)' % ds['critical_threshold']
+            params['msg'] = 'UNKNOWN: Invalid threshold configuration (%s)' % e
 
-        if 'state' not in params:
-            try:
-                if is_out_of_bounds(last, ds['warning_threshold']):
-                    params['state'] = 1 # WARNING dans Nagios
-                    params['msg'] = 'WARNING: %s' % last
-                else:
-                    params['state'] = 0 # OK dans Nagios
-                    params['msg'] = 'OK: %s' % last
-            except ValueError:
-                # La définition de seuils donnée était invalide.
-                params['state'] = 3 # UNKNOWN dans Nagios
-                params['msg'] = 'UNKNOWN: Invalid warning threshold ' \
-                                'specification (%r)' % ds['warning_threshold']
-
-        sent = self.sendItem(tpl % params)
-        sent.addCallback(msg_sent)
+        return self.sendItem(tpl % params)
 
     def _sighup_handler(self, signum, frames):
         """
@@ -402,12 +394,12 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         self.rrdtool.stop()
 
     def sendItem(self, item):
+        self._messages_sent += 1
         if not isinstance(item, etree.ElementBase):
             item = parseXml(item.encode('utf-8'))
         if item.name == MESSAGEONETOONE:
             self.sendOneToOneXml(item)
             return defer.succeed(None)
         else:
-            result = self.publishXml(item)
-            return result
+            return self.publishXml(item)
 

@@ -108,6 +108,17 @@ class ConfDB(object):
         result.addCallback(lambda results: [str(r[0]) for r in results])
         return result
 
+    def has_threshold(self, hostname, dsname):
+        if self._db is None:
+            return defer.succeed(False)
+        result = self._db.runQuery("SELECT COUNT(*) FROM perfdatasource "
+                                   "WHERE hostname = ? AND name = ? "
+                                   "AND (warning_threshold IS NOT NULL "
+                                   "     AND critical_threshold IS NOT NULL)",
+                                   (hostname, dsname) )
+        result.addCallback(lambda results: bool(results[0][0]))
+        return result
+
     def get_datasource(self, hostname, dsname):
         properties = ["id", "type", "step", "heartbeat",
                       "min", "max",
