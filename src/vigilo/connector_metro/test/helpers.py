@@ -42,10 +42,12 @@ class RRDToolProcessProtocolStub(object):
         open(filename, "w").close() # touch filename
         res = ""
         # @FIXME: Il faudrait probablement définir un autre objet stub.
-        if command == 'lastupdate' and len(self.commands) > 1:
+        if command == 'fetch' and args == 'AVERAGE --start -600' and len(self.commands) > 1:
             # La commande précédente était une mise à jour,
             # et la valeur se trouve dans les arguments.
             last_value = self.commands[-2][2].split(':', 2)[1]
+            if last_value == "U":
+                last_value = "nan"
             res = " DS\n\n42: %s\n" % last_value
         return defer.succeed(res)
 

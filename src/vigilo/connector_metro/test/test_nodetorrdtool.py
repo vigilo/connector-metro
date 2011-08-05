@@ -267,6 +267,7 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
                 self.assertEquals(0, len(self.stub.output))
             # Pour les autres, on vérifie l'alerte générée.
             else:
+                self.assertTrue(len(self.stub.output) > 0)
                 self.assertEquals(result, self.stub.output[-1].toXml())
             return None
 
