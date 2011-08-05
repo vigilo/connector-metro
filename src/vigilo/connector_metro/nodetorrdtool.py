@@ -306,7 +306,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                 return
         # récupération de la dernière valeur enregistrée
         filename = self._get_msg_filename(perf)
-        last = self.rrdtool.run("lastupdate", filename, '')
+        last = self.rrdtool.run("fetch", filename,
+                    'AVERAGE --start -%d' % (int(ds["step"]) * 2) )
         last.addCallback(self._compare_thresholds, ds, perf['host'])
         return last
 
@@ -336,11 +337,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         if not last:
             return
 
-        last = last.split(':', 1)[1].strip()
-        if last == 'U' or not last:
+        last = self._parse_rrdtool_response(last)
+        if not last:
             return
 
-        last = float(last) # python convertit tout seul la notation exposant
         last *= float(ds['factor'])
 
         # Si la dernière valeur est entière,
@@ -364,6 +364,19 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             params['msg'] = 'UNKNOWN: Invalid threshold configuration (%s)' % e
 
         return self.sendItem(tpl % params)
+
+    def _parse_rrdtool_response(self, response):
+        value = None
+        for line in response.split("\n"):
+            if not line.count(": ") == 1:
+                continue
+            timestamp, current_value = line.strip().split(": ")
+            if current_value == "nan":
+                continue
+            value = current_value
+        if value is not None:
+            value = float(value) # python convertit tout seul la notation exposant
+        return value
 
     def _sighup_handler(self, signum, frames):
         """
