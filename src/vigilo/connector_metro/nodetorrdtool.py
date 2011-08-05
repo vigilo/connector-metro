@@ -45,6 +45,19 @@ class WrongMessageType(Exception):
 class CreationError(Exception):
     pass
 
+def parse_rrdtool_response(response):
+    value = None
+    for line in response.split("\n"):
+        if not line.count(": ") == 1:
+            continue
+        timestamp, current_value = line.strip().split(": ")
+        if current_value == "nan":
+            continue
+        value = current_value
+    if value is not None:
+        value = float(value) # python convertit tout seul la notation exposant
+    return value
+
 class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
@@ -308,10 +321,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         filename = self._get_msg_filename(perf)
         last = self.rrdtool.run("fetch", filename,
                     'AVERAGE --start -%d' % (int(ds["step"]) * 2) )
-        last.addCallback(self._compare_thresholds, ds, perf['host'])
+        last.addCallback(self._compare_thresholds, ds)
         return last
 
-    def _compare_thresholds(self, last, ds, host):
+    def _compare_thresholds(self, last, ds):
         # Modèle pour la commande à envoyer à Nagios.
         tpl =   u'<%(onetoone)s to="%(recipient)s">'\
                 '<command xmlns="%(namespace)s">'\
@@ -325,7 +338,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         params = {
             'namespace': NS_COMMAND,
             'timestamp': self.get_current_time(),
-            'host': host,
+            'host': ds['hostname'],
             'service': ds['nagiosname'],
             'onetoone': MESSAGEONETOONE,
             'recipient': ds['jid'],
@@ -337,7 +350,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         if not last:
             return
 
-        last = self._parse_rrdtool_response(last)
+        last = parse_rrdtool_response(last)
         if not last:
             return
 
@@ -364,19 +377,6 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             params['msg'] = 'UNKNOWN: Invalid threshold configuration (%s)' % e
 
         return self.sendItem(tpl % params)
-
-    def _parse_rrdtool_response(self, response):
-        value = None
-        for line in response.split("\n"):
-            if not line.count(": ") == 1:
-                continue
-            timestamp, current_value = line.strip().split(": ")
-            if current_value == "nan":
-                continue
-            value = current_value
-        if value is not None:
-            value = float(value) # python convertit tout seul la notation exposant
-        return value
 
     def _sighup_handler(self, signum, frames):
         """

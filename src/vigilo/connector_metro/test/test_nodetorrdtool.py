@@ -21,6 +21,7 @@ from mock import Mock
 
 from twisted.words.protocols.jabber.jid import JID
 from twisted.internet import defer
+from twisted.python.failure import Failure
 from vigilo.connector.test.helpers import XmlStreamStub
 
 from vigilo.common.conf import settings
@@ -29,6 +30,7 @@ from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
 from vigilo.connector_metro.nodetorrdtool import NotInConfiguration
 from vigilo.connector_metro.nodetorrdtool import WrongMessageType
 from vigilo.connector_metro.nodetorrdtool import InvalidMessage
+from vigilo.connector_metro.nodetorrdtool import parse_rrdtool_response
 from vigilo.connector.converttoxml import text2xml
 from vigilo.pubsub.xml import NS_COMMAND
 
@@ -43,9 +45,6 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
     """
 
     def setUp(self):
-        """Initialisation du test."""
-        #unittest.TestCase.setUp(self)
-
         self.stub = XmlStreamStub()
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
         settings['connector-metro']['rrd_base_dir'] = \
@@ -61,7 +60,6 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         self.ntrf.connectionInitialized()
 
     def tearDown(self):
-        """Destruction des objets de test."""
         self.ntrf.stop()
         rmtree(self.tmpdir)
 
@@ -235,9 +233,36 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         d.addCallback(cb)
         return d
 
+    #@deferred(timeout=30)
+    def test_alerts_required_attrs(self):
+        """Fonction _get_last_value"""
+        full_ds = {"host": "dummy_host",
+                   "datasource": "dummy_datasource",
+                   "step": 300,
+                   "warning_threshold": "42",
+                   "critical_threshold": "43",
+                   "nagiosname": "Dummy Service",
+                   "jid": "foo@bar",
+                   }
+        required_attrs = [
+            'warning_threshold',
+            'critical_threshold',
+            'nagiosname',
+            'jid',
+        ]
+        self.ntrf._get_msg_filename = lambda x: "dummy_filename"
+        self.ntrf.rrdtool.run = lambda *a: defer.succeed(None)
+        self.ntrf._compare_thresholds = lambda ds, host: True
+        for attr in required_attrs:
+            ds = full_ds.copy()
+            ds[attr] = None
+            result = self.ntrf._get_last_value(ds, {"host": "dummy_host"})
+            self.assertTrue(result is None,
+                    "l'attribut %s devrait être obligatoire" % attr)
+
     @deferred(timeout=30)
     def test_alerts(self):
-        """Alertes sur dépassement de seuils"""
+        """Fonction _compare_thresholds"""
         # Positionne l'heure courante à "42" (timestamp UNIX) systématiquement.
         self.ntrf.get_current_time = lambda: 42
 
@@ -254,30 +279,37 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
             '0.80': res_tpl % {'state': 0, 'msg': 'OK: 0.8'},
             '0.81': res_tpl % {'state': 1, 'msg': 'WARNING: 0.81'},
             '0.91': res_tpl % {'state': 2, 'msg': 'CRITICAL: 0.91'},
-            'U': res_tpl % {'state': 3, 'msg': 'UNKNOWN'},
+            'nan': res_tpl % {'state': 3, 'msg': 'UNKNOWN'},
         }
+        ds = {"hostname": "server1.example.com",
+              "datasource": "Load",
+              "step": 300,
+              "factor": 1,
+              "warning_threshold": "0.8",
+              "critical_threshold": "0.9",
+              "nagiosname": "MetroLoad",
+              "jid": "foo@bar",
+              }
 
-        def check_result(dummy, value, result):
+        def check_result(dummy, value, expected):
             print "Checking results for value %r" % value
             print [el.toXml() for el in self.stub.output]
-
-            # Une valeur UNKNOWN ne doit pas générer d'alerte
-            # (on utilise la direction freshness_threshold de Nagios).
-            if value == 'U':
+            if value == "nan":
+                # Une valeur UNKNOWN ne doit pas générer d'alerte
+                # (on utilise la direction freshness_threshold de Nagios).
                 self.assertEquals(0, len(self.stub.output))
-            # Pour les autres, on vérifie l'alerte générée.
             else:
                 self.assertTrue(len(self.stub.output) > 0)
-                self.assertEquals(result, self.stub.output[-1].toXml())
-            return None
+                self.assertEquals(expected, self.stub.output[-1].toXml())
 
+        # Ne pas utiliser une DeferredList, ou alors avec les paramètres
+        # fireOnOneErrback=True et consumeErrors=True
+        # (mais ça fait de moins belles erreurs)
         d = defer.succeed(None)
-        tpl = "perf|1165939739|server1.example.com|Load|%s"
-        for value, result in testdata.iteritems():
-            d.addCallback(lambda x, value: \
-                self.ntrf.processMessage(text2xml(tpl % value)), value)
-            d.addCallback(check_result, value, result)
-
+        tpl = "DS\n\ntimestamp: %s\n"
+        for value, expected in testdata.iteritems():
+            d.addCallback(lambda x: self.ntrf._compare_thresholds(tpl % value, ds))
+            d.addCallback(check_result, value, expected)
         return d
 
     @deferred(timeout=30)
@@ -291,4 +323,41 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
             self.assertFalse(self.ntrf._check_thresholds.called)
         d.addCallback(check_not_called)
         return d
+
+
+class RRDToolParserTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        """Sortie de RRDTool: vide"""
+        self.assertTrue(parse_rrdtool_response("") is None)
+
+    def test_only_nan(self):
+        """Sortie de RRDTool: uniquement des NaN"""
+        output = "123456789: nan\n"
+        self.assertTrue(parse_rrdtool_response(output) is None)
+
+    def test_simple(self):
+        """Sortie de RRDTool: cas simple"""
+        output = "123456789: 42\n"
+        self.assertEqual(parse_rrdtool_response(output), 42)
+
+    def test_useless_data(self):
+        """Les données inutiles doivent être ignorées"""
+        output = "  useless data   \n123456789: 42\n"
+        self.assertEqual(parse_rrdtool_response(output), 42)
+
+    def test_exponent(self):
+        """Gestion des valeurs avec exposants"""
+        output = "123456789: 4.2e2\n"
+        self.assertEqual(parse_rrdtool_response(output), 420.0)
+
+    def test_choose_last(self):
+        """Il faut choisir la dernière valeur"""
+        output = "123456789: 41\n123456789: 42\n"
+        self.assertEqual(parse_rrdtool_response(output), 42)
+
+    def test_ignore_nan(self):
+        """Les lignes avec NaN doivent être ignorées"""
+        output = "123456789: 42\n123456789: nan\n"
+        self.assertEqual(parse_rrdtool_response(output), 42)
 

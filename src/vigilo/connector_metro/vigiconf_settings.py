@@ -161,6 +161,8 @@ class ConfDB(object):
                 if (propname == "min" or propname == "max") \
                         and d[propname] == 'None': # hum hum...
                     d[propname] = "U"
+            d["name"] = dsname
+            d["hostname"] = hostname
             return d
         result.addCallback(format_result, properties)
         return result
