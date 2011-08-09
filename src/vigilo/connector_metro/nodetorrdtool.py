@@ -351,7 +351,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             return
 
         last = parse_rrdtool_response(last)
-        if not last:
+        if last is None:
             return
 
         last *= float(ds['factor'])
