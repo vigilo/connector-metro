@@ -124,12 +124,12 @@ class RRDToolManager(object):
                          stat.S_IRGRP | stat.S_IXGRP | \
                          stat.S_IROTH | stat.S_IXOTH)
             except OSError, e:
-                raise OSError(_("Unable to create directory '%(dir)s'") % {
+                raise OSError((_("Unable to create directory '%(dir)s'") % {
                                 'dir': e.filename,
-                            })
+                            }).encode('utf-8'))
         if not self.readonly and not os.access(directory, os.W_OK):
-            raise OSError(_("Unable to write in the "
-                            "directory '%(dir)s'") % {'dir': directory})
+            raise OSError((_("Unable to write in the directory '%(dir)s'") %
+                    {'dir': directory}).encode('utf-8'))
 
     def run(self, command, filename, args):
         """
