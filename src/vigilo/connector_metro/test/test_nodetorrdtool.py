@@ -276,6 +276,9 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
             "</command>" \
             "</body></message>" % NS_COMMAND
         testdata = {
+            # 0 est là pour détecter les erreurs de comparaison
+            # (if x: ... au lieu de if x is None: ...)
+            '0': res_tpl % {'state': 0, 'msg': 'OK: 0'},
             '0.80': res_tpl % {'state': 0, 'msg': 'OK: 0.8'},
             '0.81': res_tpl % {'state': 1, 'msg': 'WARNING: 0.81'},
             '0.91': res_tpl % {'state': 2, 'msg': 'CRITICAL: 0.91'},
@@ -297,10 +300,14 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
             if value == "nan":
                 # Une valeur UNKNOWN ne doit pas générer d'alerte
                 # (on utilise la direction freshness_threshold de Nagios).
-                self.assertEquals(0, len(self.stub.output))
+                self.assertEquals(0, len(self.stub.output),
+                    "Pas d'alerte pour un état UNKNOWN")
             else:
                 self.assertTrue(len(self.stub.output) > 0)
                 self.assertEquals(expected, self.stub.output[-1].toXml())
+            # On vide la file de message pour permettre
+            # la vérification suivante dans ce test.
+            self.stub.output = []
 
         # Ne pas utiliser une DeferredList, ou alors avec les paramètres
         # fireOnOneErrback=True et consumeErrors=True
