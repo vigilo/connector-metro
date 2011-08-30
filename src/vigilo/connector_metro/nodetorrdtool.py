@@ -78,7 +78,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         try:
-            self.must_check_thresholds = settings['connector-metro'].as_bool('check_threshold')
+            self.must_check_thresholds = settings['connector-metro'].as_bool('check_thresholds')
         except KeyError:
             self.must_check_thresholds = True
         # Sauvegarde du handler courant pour SIGHUP
