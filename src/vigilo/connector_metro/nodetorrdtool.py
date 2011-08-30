@@ -173,6 +173,13 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                               "'%(tag)s' tag)")
                 return defer.fail(InvalidMessage(errormsg % {"tag": i}))
 
+        if perf["value"] != "U":
+            try:
+                float(perf["value"])
+            except ValueError:
+                return defer.fail(InvalidMessage(
+                            _("Invalid metrology value: %s") % perf["value"]))
+
         d = self.confdb.has_host(perf["host"])
         def cb(isinconf, perf):
             if not isinconf:

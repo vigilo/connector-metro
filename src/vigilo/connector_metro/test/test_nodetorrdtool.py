@@ -203,6 +203,29 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         return d
 
     @deferred(timeout=30)
+    def test_valid_values(self):
+        """Réception d'un message avec une valeur valide"""
+        valid_values = ["1", "1.2", "U"]
+        dl = []
+        for value in valid_values:
+            xml = text2xml("perf|1165939739|server1.example.com|Load|%s" % value)
+            d = self.ntrf._parse_message(xml)
+            dl.append(d)
+        return defer.DeferredList(dl, fireOnOneErrback=True)
+
+    @deferred(timeout=30)
+    def test_invalid_value_1(self):
+        """Réception d'un message avec une valeur invalide (#802)"""
+        xml = text2xml("perf|1165939739|server1.example.com|Load|Invalid value")
+        d = self.ntrf._parse_message(xml)
+        def cb(r):
+            self.fail("Il y aurait du y avoir un errback")
+        def eb(f):
+            self.assertEqual(f.type, InvalidMessage)
+        d.addCallbacks(cb, eb)
+        return d
+
+    @deferred(timeout=30)
     def test_already_created(self):
         """Pas de création si le fichier existe déjà"""
         rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
