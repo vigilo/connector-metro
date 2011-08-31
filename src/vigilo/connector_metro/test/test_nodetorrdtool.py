@@ -252,6 +252,7 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
                 'forwarded': 0,
                 'pds_count': 3,
                 'sent': 0,
+                'illegal_updates': 0,
             })
         d.addCallback(cb)
         return d

@@ -91,6 +91,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         # Sous-processus
         self.rrdtool = RRDToolManager()
         self.max_send_simult = len(self.rrdtool.pool)
+        self._illegal_updates = 0
 
     def connectionInitialized(self):
         """
@@ -100,6 +101,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         """
         super(NodeToRRDtoolForwarder, self).connectionInitialized()
         self.rrdtool.start()
+        # On réinitialise le compteur à chaque connexion établie avec succès.
+        self._illegal_updates = 0
 
     @defer.inlineCallbacks
     def createRRD(self, filename, perf):
@@ -294,10 +297,18 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
 
     def _eb_rrdtool(self, f):
         f.trap(RRDToolError)
+        error_msg = f.getErrorMessage()
+
+        # Le message de rrdtool ne dépend pas de la locale,
+        # donc on peut faire ce test sans crainte.
+        if error_msg.endswith('(minimum one second step)'):
+            self._illegal_updates += 1
+            return
+
         LOGGER.error(_("RRDtool could not update the file %(filename)s. "
                        "Message: %(msg)s"), {
                      'filename': f.value.filename,
-                     'msg': f.getErrorMessage() })
+                     'msg': error_msg })
 
     def _check_thresholds(self, perf):
         if perf is None:
@@ -407,6 +418,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         stats = yield super(NodeToRRDtoolForwarder, self).getStats()
         ds_count = yield self.confdb.count_datasources()
         stats["pds_count"] = ds_count
+        stats["illegal_updates"] = self._illegal_updates
         defer.returnValue(stats)
 
     def stop(self):
