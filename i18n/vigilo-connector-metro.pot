@@ -7,9 +7,9 @@
 #, fuzzy
 msgid ""
 msgstr ""
-"Project-Id-Version: vigilo-connector-metro 2.0.5\n"
+"Project-Id-Version: vigilo-connector-metro 2.0.6\n"
 "Report-Msgid-Bugs-To: contact@projet-vigilo.org\n"
-"POT-Creation-Date: 2011-08-19 18:23+0200\n"
+"POT-Creation-Date: 2011-09-01 15:07+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -24,42 +24,47 @@ msgid ""
 "the settings.ini."
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:129
+#: src/vigilo/connector_metro/nodetorrdtool.py:132
 #, python-format
 msgid "Host '%(host)s' with datasource '%(ds)s' not found in the configuration !"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:150
+#: src/vigilo/connector_metro/nodetorrdtool.py:153
 #, python-format
 msgid "RRDtool could not create the file: %(filename)s. Message: %(msg)s"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:162
+#: src/vigilo/connector_metro/nodetorrdtool.py:165
 #, python-format
 msgid "'%(msgtype)s' is not a valid message type for metrology"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:172
+#: src/vigilo/connector_metro/nodetorrdtool.py:175
 #, python-format
 msgid "Not a valid performance message (missing '%(tag)s' tag)"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:180
+#: src/vigilo/connector_metro/nodetorrdtool.py:184
+#, python-format
+msgid "Invalid metrology value: %s"
+msgstr ""
+
+#: src/vigilo/connector_metro/nodetorrdtool.py:190
 #, python-format
 msgid "Skipping perf update for host %s"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:206
+#: src/vigilo/connector_metro/nodetorrdtool.py:216
 #, python-format
 msgid "Unable to create the directory '%s'"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:290
+#: src/vigilo/connector_metro/nodetorrdtool.py:308
 #, python-format
 msgid "RRDtool could not update the file %(filename)s. Message: %(msg)s"
 msgstr ""
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:390
+#: src/vigilo/connector_metro/nodetorrdtool.py:408
 msgid "Received signal to reload the configuration"
 msgstr ""
 

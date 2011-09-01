@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version:  vigilo.connector-metro\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
 "POT-Creation-Date: 2010-11-19 12:03+0100\n"
-"PO-Revision-Date: 2011-08-19 18:23+0200\n"
+"PO-Revision-Date: 2011-09-01 15:07+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: fr <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n > 1)\n"
@@ -25,46 +25,51 @@ msgstr ""
 "Veuillez indiquer l'emplacement de la base de configuration générée par "
 "VigiConf dans le fichier settings.ini."
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:129
+#: src/vigilo/connector_metro/nodetorrdtool.py:132
 #, python-format
 msgid "Host '%(host)s' with datasource '%(ds)s' not found in the configuration !"
 msgstr ""
 "L'hôte '%(host)s' avec la source de données '%(ds)s' n'a pas été trouvé "
 "dans le fichier de configuration !"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:150
+#: src/vigilo/connector_metro/nodetorrdtool.py:153
 #, python-format
 msgid "RRDtool could not create the file: %(filename)s. Message: %(msg)s"
 msgstr "RRDtool n'a pas pu créer le fichier %(filename)s. Message : %(msg)s"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:162
+#: src/vigilo/connector_metro/nodetorrdtool.py:165
 #, python-format
 msgid "'%(msgtype)s' is not a valid message type for metrology"
 msgstr "'%(msgtype)s' n'est pas un type de message valide pour la métrologie"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:172
+#: src/vigilo/connector_metro/nodetorrdtool.py:175
 #, python-format
 msgid "Not a valid performance message (missing '%(tag)s' tag)"
 msgstr "Message de performance non valide (il manque la balise '%(tag)s')"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:180
+#: src/vigilo/connector_metro/nodetorrdtool.py:184
+#, python-format
+msgid "Invalid metrology value: %s"
+msgstr "Valeur de métrologie non valide : %s"
+
+#: src/vigilo/connector_metro/nodetorrdtool.py:190
 #, python-format
 msgid "Skipping perf update for host %s"
 msgstr "Mise à jour de la donnée de performance sur l'hôte %s ignorée"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:206
+#: src/vigilo/connector_metro/nodetorrdtool.py:216
 #, python-format
 msgid "Unable to create the directory '%s'"
 msgstr "Impossible de créer le dossier '%s'"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:290
+#: src/vigilo/connector_metro/nodetorrdtool.py:308
 #, python-format
 msgid "RRDtool could not update the file %(filename)s. Message: %(msg)s"
 msgstr ""
 "RRDtool n'a pas pu mettre à jour le fichier %(filename)s. Message : "
 "%(msg)s"
 
-#: src/vigilo/connector_metro/nodetorrdtool.py:390
+#: src/vigilo/connector_metro/nodetorrdtool.py:408
 msgid "Received signal to reload the configuration"
 msgstr "Réception du signal de rechargement de la configuration"
 

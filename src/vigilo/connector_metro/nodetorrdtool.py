@@ -164,8 +164,9 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         if msg.name != 'perf':
             errormsg = _("'%(msgtype)s' is not a valid message type for "
                          "metrology")
-            return defer.fail(WrongMessageType(errormsg
-                                               % {'msgtype' : msg.name}))
+            return defer.fail(WrongMessageType((
+                    errormsg % {'msgtype' : msg.name}
+                ).encode('utf-8')))
         perf = {}
         for c in msg.children:
             perf[str(c.name)] = str(c.children[0])
@@ -174,20 +175,24 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             if i not in perf:
                 errormsg = _(u"Not a valid performance message (missing "
                               "'%(tag)s' tag)")
-                return defer.fail(InvalidMessage(errormsg % {"tag": i}))
+                return defer.fail(InvalidMessage((
+                        errormsg % {"tag": i}
+                    ).encode('utf-8')))
 
         if perf["value"] != "U":
             try:
                 float(perf["value"])
             except ValueError:
-                return defer.fail(InvalidMessage(
-                            _("Invalid metrology value: %s") % perf["value"]))
+                return defer.fail(InvalidMessage((
+                        _("Invalid metrology value: %s") % perf["value"]
+                    ).encode('utf-8')))
 
         d = self.confdb.has_host(perf["host"])
         def cb(isinconf, perf):
             if not isinconf:
-                return defer.fail(NotInConfiguration(
-                        _("Skipping perf update for host %s") % perf["host"]))
+                return defer.fail(NotInConfiguration((
+                        _("Skipping perf update for host %s") % perf["host"]
+                    ).encode('utf-8')))
             return perf
         d.addCallback(cb, perf)
         return d
