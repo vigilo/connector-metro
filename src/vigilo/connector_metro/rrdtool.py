@@ -43,11 +43,23 @@ class RRDToolManager(object):
     redémarre s'il s'arrête.
     """
 
-    def __init__(self, readonly=False):
+    def __init__(self, readonly=False, check_thresholds=True):
         self.readonly = readonly
         self.job_count = 0
         self.started = False
-        self.rrdcached = settings["connector-metro"].get("rrdcached", None)
+        self.pool = None
+        self.pool_direct = None
+        self.createPools(check_thresholds)
+
+    def createPools(self, check_thresholds):
+        rrdcached = settings["connector-metro"].get("rrdcached", None)
+        pool_size = self.computePoolSize()
+        self.pool = RRDToolPool(pool_size, rrdcached=rrdcached)
+        if rrdcached and check_thresholds:
+            # On créé un petit pool sans RRDcached
+            self.pool_direct = RRDToolPool(1)
+
+    def computePoolSize(self):
         try:
             pool_size = settings["connector-metro"].as_int("rrd_processes")
         except KeyError:
@@ -58,17 +70,7 @@ class RRDToolManager(object):
             if pool_size > 4:
                 # on limite, sinon on passe trop de temps à choisir
                 pool_size = 4
-        self.pool = []
-        self._lock = defer.DeferredSemaphore(pool_size)
-        self.buildPool(pool_size)
-
-    def buildPool(self, pool_size):
-        rrd_bin = settings['connector-metro']['rrd_bin']
-        env = {}
-        if self.rrdcached:
-            env["RRDCACHED_ADDRESS"] = self.rrdcached
-        for i in range(pool_size):
-            self.pool.append(RRDToolProcessProtocol(rrd_bin, env))
+        return pool_size
 
     def start(self):
         """
@@ -82,19 +84,22 @@ class RRDToolManager(object):
         except OSError, e:
             return defer.fail(e)
 
-        results = []
-        for rrdtool in self.pool:
-            results.append(rrdtool.start())
-        d = defer.DeferredList(results)
+        d = self.pool.start()
+        if self.pool_direct is not None:
+            d.addCallback(lambda x: self.pool_direct.start())
         def flag_started(r):
             self.started = True
         d.addCallback(flag_started)
         return d
 
     def stop(self):
-        for rrdtool in self.pool:
-            rrdtool.quit()
-        self.started = False
+        d = self.pool.stop()
+        if self.pool_direct is not None:
+            d.addCallback(lambda x: self.pool_direct.stop())
+        def flag_stopped(r):
+            self.started = False
+        d.addCallback(flag_stopped)
+        return d
 
     def checkBinary(self):
         rrd_bin = settings['connector-metro']['rrd_bin']
@@ -131,7 +136,7 @@ class RRDToolManager(object):
             raise OSError((_("Unable to write in the directory '%(dir)s'") %
                     {'dir': directory}).encode('utf-8'))
 
-    def run(self, command, filename, args):
+    def run(self, command, filename, args, no_rrdcached=False):
         """
         Lance une commande par RRDTool
 
@@ -145,26 +150,14 @@ class RRDToolManager(object):
         @return: le Deferred contenant le résultat ou l'erreur
         @rtype: C{Deferred}
         """
-        d = self.start() # enchaîne tout de suite si on est déjà démarré
-        if len(self.pool) == 1:
-            d.addCallback(lambda x: self.pool[0].run(command, filename, args))
-        else:
-            d.addCallback(lambda x: self._lock.run(self._dispatch, command,
-                                                   filename, args))
-        return d
-
-    def _dispatch(self, command, filename, args):
-        """
-        Distribue les tâches sur les processus RRDtool disponibles
-        """
         self.job_count += 1
-        for index, rrdtool in enumerate(self.pool):
-            if rrdtool.working:
-                continue
-            #LOGGER.debug("Running job %d on process %d",
-            #             self.job_count, index+1)
-            return rrdtool.run(command, filename, args)
-        raise NoAvailableProcess()
+        d = self.start() # enchaîne tout de suite si on est déjà démarré
+        if no_rrdcached and self.pool_direct is not None:
+            pool = self.pool_direct
+        else:
+            pool = self.pool
+        d.addCallback(lambda x: pool.run(command, filename, args))
+        return d
 
 
 class RRDToolProcessProtocol(protocol.ProcessProtocol):
@@ -173,6 +166,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         self.rrd_bin = rrd_bin
         self.deferred = None
         self.deferred_start = None
+        self.deferred_stop = None
         self._current_data = []
         self._keep_alive = True
         self._filename = None
@@ -261,9 +255,13 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
 
     def quit(self):
         self._keep_alive = False
+        self.deferred_stop = defer.Deferred()
         if self.transport is not None:
             self.transport.write("quit\n")
             self.transport.loseConnection()
+            return self.deferred_stop
+        else:
+            return defer.succeed(None)
         #self.transport.signalProcess('TERM')
 
     def processEnded(self, reason):
@@ -275,7 +273,73 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                            {"rcode": reason.value.exitCode, # peut être None
                             "msg": reason.getErrorMessage()})
         if not self._keep_alive:
+            if self.deferred_stop is not None:
+                self.deferred_stop.callback(None)
             return
         # respawn
         LOGGER.info(_('Restarting...'))
         self.start()
+
+
+class RRDToolPool(object):
+    """
+    Gestionnaire de pool de processus RRDTool, interface bas-niveau
+    """
+
+    processProtocolFactory = RRDToolProcessProtocol
+
+    def __init__(self, size, rrdcached=None):
+        self.size = size
+        self.rrdcached = rrdcached
+        self.pool = []
+        self._lock = defer.DeferredSemaphore(self.size)
+
+    def __len__(self):
+        return self.size
+    def __contains__(self, elem):
+        return elem in self.pool
+    def __iter__(self):
+        return self.pool.__iter__()
+
+    def build(self):
+        rrd_bin = settings['connector-metro']['rrd_bin']
+        env = {}
+        if self.rrdcached:
+            env["RRDCACHED_ADDRESS"] = self.rrdcached
+        for i in range(self.size):
+            self.pool.append(self.processProtocolFactory(rrd_bin, env))
+
+    def start(self):
+        if not self.pool:
+            self.build()
+        results = []
+        for rrdtool in self.pool:
+            results.append(rrdtool.start())
+        return defer.DeferredList(results)
+
+    def stop(self):
+        results = []
+        for rrdtool in self.pool:
+            results.append(rrdtool.quit())
+        return defer.DeferredList(results)
+
+    def run(self, command, filename, args):
+        """
+        Lance une commande par RRDTool.  Attention, le pool doit déjà avoir été
+        démarré.
+        """
+        return self._lock.run(self._dispatch, command, filename, args)
+
+    def _dispatch(self, command, filename, args):
+        """
+        Distribue les tâches sur les processus RRDtool disponibles
+        """
+        for index, rrdtool in enumerate(self.pool):
+            if rrdtool.working:
+                continue
+            #LOGGER.debug("Running job %d on process %d",
+            #             self.job_count, index+1)
+            return rrdtool.run(command, filename, args)
+        raise NoAvailableProcess()
+
+

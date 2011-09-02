@@ -78,7 +78,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
         self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
         try:
-            self.must_check_thresholds = settings['connector-metro'].as_bool('check_thresholds')
+            self.must_check_thresholds = \
+                    settings['connector-metro'].as_bool('check_thresholds')
         except KeyError:
             self.must_check_thresholds = True
         # Sauvegarde du handler courant pour SIGHUP
@@ -89,9 +90,12 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         # Configuration
         self.confdb = ConfDB(confdb_path)
         # Sous-processus
-        self.rrdtool = RRDToolManager()
-        self.max_send_simult = len(self.rrdtool.pool)
+        self.rrdtool = RRDToolManager(
+                            check_thresholds=self.must_check_thresholds)
+        self.max_send_simult = self.rrdtool.computePoolSize()
         self._illegal_updates = 0
+        # Tests unitaires
+        self._check_thresholds_synchronously = False
 
     def connectionInitialized(self):
         """
@@ -261,10 +265,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         """
         d = self._parse_message(msg)
         d.addCallbacks(self._create_if_needed, self._eb)
+        d.addCallback(self._check_has_thresholds)
         d.addCallbacks(self._run_rrdtool, self._eb)
         d.addErrback(self._eb_rrdtool)
-        if self.must_check_thresholds:
-            d.addCallback(self._check_thresholds)
+        d.addCallback(self._check_thresholds)
         return d
 
     def _eb(self, f):
@@ -289,6 +293,20 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
         return d
 
+    def _check_has_thresholds(self, perf):
+        """Ajoute au message l'information de la présence d'un seuil"""
+        if perf is None:
+            return None
+        if not self.must_check_thresholds:
+            perf["has_thresholds"] = False
+            return perf
+        d = self.confdb.has_threshold(perf["host"], perf["datasource"])
+        def extend_has_th(result, perf):
+            perf["has_thresholds"] = result
+            return perf
+        d.addCallback(extend_has_th, perf)
+        return d
+
     def _run_rrdtool(self, perf):
         if perf is None:
             return None
@@ -296,7 +314,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         filename = self._get_msg_filename(perf)
         basedir = os.path.dirname(filename)
         self._makedirs(basedir)
-        d2 = self.rrdtool.run("update", filename, cmd)
+        d2 = self.rrdtool.run("update", filename, cmd,
+                              no_rrdcached=perf["has_thresholds"])
         d2.addCallback(lambda x: perf)
         return d2
 
@@ -315,19 +334,15 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                      'filename': f.value.filename,
                      'msg': error_msg })
 
-    def _check_thresholds(self, perf):
+    def _check_thresholds(self, perf, sync=False):
         if perf is None:
             return None
-        d = self.confdb.has_threshold(perf["host"], perf["datasource"])
-        d.addCallback(self._checked_has_threshold, perf)
-        return d
-
-    def _checked_has_threshold(self, has_th, perf):
-        if not has_th:
-            return None
+        if not self.must_check_thresholds or not perf["has_thresholds"]:
+            return perf
         ds = self.confdb.get_datasource(perf["host"], perf["datasource"])
         ds.addCallback(self._get_last_value, perf)
-        return ds
+        if self._check_thresholds_synchronously:
+            return ds
 
     def _get_last_value(self, ds, perf):
         # simple précaution, redondant avec self.confdb.has_threshold
@@ -343,7 +358,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         # récupération de la dernière valeur enregistrée
         filename = self._get_msg_filename(perf)
         last = self.rrdtool.run("fetch", filename,
-                    'AVERAGE --start -%d' % (int(ds["step"]) * 2) )
+                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
+                    no_rrdcached=True)
         last.addCallback(self._compare_thresholds, ds)
         return last
 

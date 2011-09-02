@@ -79,6 +79,7 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         def check_created(r):
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
         def check_creation_command(r):
+            self.assertTrue(len(self.rrdtool.commands) > 0)
             self.assertEqual(self.rrdtool.commands[0], ('create', rrdfile,
                 ['--step', '300', '--start', '1165939729',
                  'RRA:AVERAGE:0.5:1:600', 'RRA:AVERAGE:0.5:6:700',
@@ -344,17 +345,39 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         return d
 
     @deferred(timeout=30)
-    def test_handled_host(self):
+    def test_no_check_thresholds(self):
         """Désactivation de la vérification des seuils"""
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
         self.ntrf.must_check_thresholds = False
-        self.ntrf._check_thresholds = Mock()
+        self.ntrf._get_last_value = Mock()
         d = self.ntrf.processMessage(xml)
         def check_not_called(_r):
-            self.assertFalse(self.ntrf._check_thresholds.called)
+            self.assertFalse(self.ntrf._get_last_value.called)
         d.addCallback(check_not_called)
         return d
 
+    @deferred(timeout=30)
+    def test_no_rrdcached(self):
+        """Ne pas utiliser RRDCached s'il y a des seuils"""
+        rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
+                               "server1.example.com", "Load.rrd")
+        xml = text2xml("perf|1165939739|server1.example.com|Load|12")
+        self.ntrf.createRRD = Mock(name="createRRD")
+        self.ntrf.createRRD.side_effect = lambda x, y: defer.succeed(None)
+        if not os.path.exists(os.path.dirname(rrdfile)):
+            os.makedirs(os.path.dirname(rrdfile))
+        open(rrdfile, "w").close() # touch
+        self.ntrf.rrdtool.run = Mock(name="run")
+        self.ntrf.rrdtool.run.side_effect = lambda *a, **kw: defer.succeed(None)
+        d = self.ntrf.processMessage(xml)
+        def check_no_rrdcached(r):
+            print self.ntrf.rrdtool.run.call_args_list
+            for cmd in self.ntrf.rrdtool.run.call_args_list:
+                print cmd
+                self.assertTrue("no_rrdcached" in cmd[1])
+                self.assertTrue(cmd[1]["no_rrdcached"])
+        d.addCallback(check_no_rrdcached)
+        return d
 
 class RRDToolParserTestCase(unittest.TestCase):
 

@@ -23,10 +23,10 @@ class RRDToolManagerStub(RRDToolManager):
         self.commands = []
         super(RRDToolManagerStub, self).__init__()
 
-    def buildPool(self, pool_size):
-        for i in range(pool_size):
-            proc = RRDToolProcessProtocolStub(self.commands)
-            self.pool.append(proc)
+    def createPools(self, check_thresholds):
+        super(RRDToolManagerStub, self).createPools(check_thresholds)
+        self.pool.processProtocolFactory = \
+                lambda *a: RRDToolProcessProtocolStub(self.commands)
 
 class RRDToolProcessProtocolStub(object):
     def __init__(self, commands):
@@ -35,7 +35,7 @@ class RRDToolProcessProtocolStub(object):
     def start(self):
         return defer.succeed(None)
     def quit(self):
-        pass
+        return defer.succeed(None)
     def run(self, command, filename, args):
         self.commands.append((command, filename, args))
         print "Running: %s on %s with %r" % (command, filename, args)

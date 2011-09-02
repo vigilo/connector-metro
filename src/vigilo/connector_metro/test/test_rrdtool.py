@@ -21,6 +21,8 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
+from mock import Mock
+
 from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
@@ -32,41 +34,39 @@ from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.rrdtool import RRDToolProcessProtocol
 from vigilo.connector_metro.rrdtool import RRDToolError
 
-from .helpers import TransportStub
+from vigilo.connector_metro.test.helpers import TransportStub
 
-
-class RRDtoolManagerTest(unittest.TestCase):
+class RRDToolManagerTestCase(unittest.TestCase):
     """
     Test du gestionnaire de pool de processus RRDTool
     """
 
     def setUp(self):
-        """Initialisation du test."""
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
         settings['connector-metro']['rrd_base_dir'] = \
                 os.path.join(self.tmpdir, "rrds")
         os.mkdir(settings['connector-metro']['rrd_base_dir'])
-        self.mgr = RRDToolManager()
-        self._old_rrd_bin = settings['connector-metro']['rrd_bin']
 
     def tearDown(self):
-        """Destruction des objets de test."""
         rmtree(self.tmpdir)
-        settings['connector-metro']['rrd_bin'] = self._old_rrd_bin
+        settings.reset()
+        settings.load_module(__name__)
 
 
     def test_no_binary_1(self):
         """L'exécutable rrdtool n'existe pas (checkBinary)"""
+        mgr = RRDToolManager()
         settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
                                                               "dummy")
-        self.assertRaises(OSError, self.mgr.checkBinary)
+        self.assertRaises(OSError, mgr.checkBinary)
 
     @deferred(timeout=30)
     def test_no_binary_2(self):
         """L'exécutable rrdtool n'existe pas (start)"""
+        mgr = RRDToolManager()
         settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
                                                               "dummy")
-        d = self.mgr.start()
+        d = mgr.start()
         def cb(r):
             self.fail("Il y aurait dû y avoir un errback")
         def eb(f):
@@ -76,23 +76,100 @@ class RRDtoolManagerTest(unittest.TestCase):
 
     def test_not_executable_1(self):
         """L'exécutable rrdtool n'est pas exécutable (checkBinary)"""
+        mgr = RRDToolManager()
         settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
                                                               "dummy")
         open(settings['connector-metro']['rrd_bin'], "w").close()
-        self.assertRaises(OSError, self.mgr.checkBinary)
+        self.assertRaises(OSError, mgr.checkBinary)
 
     @deferred(timeout=30)
     def test_not_executable_2(self):
         """L'exécutable rrdtool n'est pas exécutable (start)"""
+        mgr = RRDToolManager()
         settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
                                                               "dummy")
         open(settings['connector-metro']['rrd_bin'], "w").close()
-        d = self.mgr.start()
+        d = mgr.start()
         def cb(r):
             self.fail("Il y aurait dû y avoir un errback")
         def eb(f):
             self.assertEqual(f.type, OSError)
         d.addCallbacks(cb, eb)
+        return d
+
+    @deferred(timeout=30)
+    def test_with_rrdcached(self):
+        """
+        Si RRDcached est activé, la bonne variable d'env doit être propagée
+        """
+        settings["connector-metro"]["rrdcached"] = self.tmpdir
+        mgr = RRDToolManager()
+        # Ne rien forker
+        mgr.pool.build()
+        mgr.pool_direct.build()
+        for p in mgr.pool.pool + mgr.pool_direct.pool:
+            p.start = lambda: defer.succeed(None)
+        d = mgr.start()
+        def check(r):
+            self.assertTrue(len(mgr.pool) > 0)
+            for p in mgr.pool:
+                self.assertTrue("RRDCACHED_ADDRESS" in p.env)
+                self.assertEqual(p.env["RRDCACHED_ADDRESS"], self.tmpdir)
+        d.addCallback(check)
+        return d
+
+    @deferred(timeout=30)
+    def test_with_check_thresholds(self):
+        """
+        Si la vérification de seuils est activée, il faut un second pool
+        """
+        settings["connector-metro"]["rrdcached"] = self.tmpdir
+        mgr = RRDToolManager(check_thresholds=True)
+        # Ne rien forker
+        mgr.pool.build()
+        mgr.pool_direct.build()
+        for p in mgr.pool.pool + mgr.pool_direct.pool:
+            p.start = lambda: defer.succeed(None)
+        d = mgr.start()
+        def check(r):
+            self.assertTrue(mgr.pool_direct is not None)
+            self.assertTrue(len(mgr.pool_direct) > 0)
+            for p in mgr.pool_direct:
+                self.assertTrue("RRDCACHED_ADDRESS" not in p.env)
+        d.addCallback(check)
+        return d
+
+    def test_without_check_thresholds(self):
+        """
+        Si la vérification de seuils est désactivée, pas besoin de second pool
+        """
+        settings["connector-metro"]["rrdcached"] = self.tmpdir
+        mgr = RRDToolManager(check_thresholds=False)
+        self.assertTrue(mgr.pool_direct is None)
+
+    @deferred(timeout=30)
+    def test_with_or_without_rrdcached(self):
+        """L'argument no_rrdcached doit envoyer sur le bon pool"""
+        settings["connector-metro"]["rrdcached"] = self.tmpdir
+        mgr = RRDToolManager(check_thresholds=True)
+        mgr.pool.run = Mock(name="with")
+        mgr.pool_direct.run = Mock(name="without")
+        # Ne rien forker
+        mgr.pool.build()
+        mgr.pool_direct.build()
+        for p in mgr.pool.pool + mgr.pool_direct.pool:
+            p.start = lambda: defer.succeed(None)
+        d = mgr.start()
+        def run_with_rrdcached(r):
+            return mgr.run("with", "with", ["with"])
+        def run_without_rrdcached(r):
+            return mgr.run("without", "without", ["without"], no_rrdcached=True)
+        def check(r):
+            mgr.pool.run.assert_called_with("with", "with", ["with"])
+            mgr.pool_direct.run.assert_called_with("without", "without", ["without"])
+        d.addCallback(run_with_rrdcached)
+        d.addCallback(run_without_rrdcached)
+        d.addCallback(check)
         return d
 
 
