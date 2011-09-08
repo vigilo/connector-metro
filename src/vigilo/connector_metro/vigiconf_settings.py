@@ -33,7 +33,7 @@ class ConfDB(object):
         self._db = None
         self._timestamp = 0
         self._reload_task = task.LoopingCall(self.reload)
-        self._cache = {"hosts": None, "has_threshold": None}
+        self._cache = {"hosts": None, "has_threshold": None, "ds": {}}
         self.start()
 
     def start(self):
@@ -55,9 +55,7 @@ class ConfDB(object):
         self._db = adbapi.ConnectionPool("sqlite3", self.path,
                                          check_same_thread=False)
         LOGGER.debug("Connected to the configuration database")
-        # mise en cache de la liste des hôtes
-        self.get_hosts()
-        self.list_thresholds()
+        self._rebuild_cache()
 
     def reload(self):
         """
@@ -75,9 +73,12 @@ class ConfDB(object):
         self._db.close()
         self._db.start()
         self._timestamp = current_timestamp
-        # mise en cache de la liste des hôtes
+        self._rebuild_cache()
+
+    def _rebuild_cache(self):
         self._cache["hosts"] = None
         self._cache["has_threshold"] = None
+        self._cache["ds"] = {}
         self.get_hosts()
         self.list_thresholds()
 
@@ -139,7 +140,7 @@ class ConfDB(object):
         result.addCallback(lambda results: bool(len(results)))
         return result
 
-    def get_datasource(self, hostname, dsname):
+    def get_datasource(self, hostname, dsname, cache=False):
         properties = ["id", "type", "step", "heartbeat",
                       "min", "max",
                       "factor",
@@ -147,6 +148,8 @@ class ConfDB(object):
                       "nagiosname", "jid"]
         if self._db is None:
             return defer.succeed(dict([(p, None) for p in properties]))
+        if cache and (hostname, dsname) in self._cache["ds"]:
+            return defer.succeed(self._cache["ds"][(hostname, dsname)])
         result = self._db.runQuery(
                 "SELECT idperfdatasource, %s FROM perfdatasource WHERE "
                 "name = ? AND hostname = ?" % ", ".join(properties[1:]),
@@ -163,6 +166,8 @@ class ConfDB(object):
                     d[propname] = "U"
             d["name"] = dsname
             d["hostname"] = hostname
+            if cache:
+                self._cache["ds"][(d["hostname"], d["name"])] = d
             return d
         result.addCallback(format_result, properties)
         return result

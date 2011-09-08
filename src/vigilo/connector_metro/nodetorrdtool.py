@@ -339,7 +339,8 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             return None
         if not self.must_check_thresholds or not perf["has_thresholds"]:
             return perf
-        ds = self.confdb.get_datasource(perf["host"], perf["datasource"])
+        ds = self.confdb.get_datasource(perf["host"], perf["datasource"],
+                                        cache=True)
         ds.addCallback(self._get_last_value, perf)
         if self._check_thresholds_synchronously:
             return ds
