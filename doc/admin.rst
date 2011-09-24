@@ -99,7 +99,7 @@ recensées dans le tableau suivant.
 | loggers           | Contient la configuration du mécanisme de journalisation des événements   |
 +-------------------+ (voir chapitre correspondant).                                            |
 | handlers          |                                                                           |
-+-------------------+ « * » correspond au nom d'un logger/handler/formatter défini dans la      |
++-------------------+ « \* » correspond au nom d'un logger/handler/formatter défini dans la     |
 | formatters        | section loggers, handlers ou formatters (respectivement).                 |
 +-------------------+                                                                           |
 | logger_*          |                                                                           |
