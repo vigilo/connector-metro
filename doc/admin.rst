@@ -65,148 +65,16 @@ Configuration
 Le module connector-metro est fourni avec un fichier de configuration situé
 par défaut dans ``/etc/vigilo/connector-metro/settings.ini``.
 
-Ce fichier est composé de différentes sections permettant de paramétrer des
-aspects divers du module, chacune de ces sections peut contenir un ensemble de
-valeurs sous la forme ``clé = valeur``. Les lignes commençant par « ; » ou
-« # » sont des commentaires et sont par conséquent ignorées.
+.. include:: ../../connector/doc/admin-conf-1.rst
 
-Le format de ce fichier peut donc être résumé dans l'extrait suivant::
+.. Lister ici les sections spécifiques au connecteur
 
-    # Ceci est un commentaire
-    ; Ceci est également un commentaire
-    [section1]
-    option1=valeur1
-    option2=valeur2
-    ...
-    
-    [section2]
-    option1=val1
-    ...
+connector-metro
+    Contient les options spécifiques au connecteur metro.                     |
 
-Les sections utilisées par le connecteur de métrologie et leur rôle sont
-recensées dans le tableau suivant.
+.. include:: ../../connector/doc/admin-conf-2.rst
 
-+-------------------+---------------------------------------------------------------------------+
-| Section           | Description                                                               |
-+===================+===========================================================================+
-| bus               | Contient les options relatives à la configuration de l'accès au bus XMPP. |
-+-------------------+---------------------------------------------------------------------------+
-| connector         | Contient les options de configuration génériques d'un connecteur de       |
-|                   | Vigilo.                                                                   |
-+-------------------+---------------------------------------------------------------------------+
-| connector-metro   | Contient les options spécifiques au connecteur metro.                     |
-+-------------------+---------------------------------------------------------------------------+
-| loggers           | Contient la configuration du mécanisme de journalisation des événements   |
-+-------------------+ (voir chapitre correspondant).                                            |
-| handlers          |                                                                           |
-+-------------------+ « \* » correspond au nom d'un logger/handler/formatter défini dans la     |
-| formatters        | section loggers, handlers ou formatters (respectivement).                 |
-+-------------------+                                                                           |
-| logger_*          |                                                                           |
-+-------------------+                                                                           |
-| handler_*         |                                                                           |
-+-------------------+                                                                           |
-| formatter_*       |                                                                           |
-+-------------------+---------------------------------------------------------------------------+
-
-
-Configuration de la connexion au serveur XMPP (Jabber)
-------------------------------------------------------
-Le composant connector-metro utilise un bus de communication basé sur le
-protocole XMPP pour communiquer avec les autres connecteurs de Vigilo.
-
-Ce chapitre décrit les différentes options de configuration se rapportant à la
-connexion à ce bus de communication, situées dans la section ``[bus]`` du fichier
-de configuration.
-
-Trace des messages échangés avec le bus
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-L'option « log_traffic » est un booléen permettant d'afficher tous les messages
-échangés avec le bus XMPP lorsqu'il est positionné à « True ». Cette option
-génère un volume d'événements de journalisation très important et n'est donc
-pas conseillée en production.
-
-Adresse du bus
-^^^^^^^^^^^^^^
-L'option « host » permet d'indiquer le nom ou l'adresse IP de l'hôte sur lequel
-le bus XMPP fonctionne.
-
-Nom du service de publication sur le bus
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Le connecteur utilise le protocole de publication de messages décrit dans le
-document XEP-0060 pour échanger des informations avec les autres connecteurs de
-Vigilo.
-
-Ce protocole nécessite de spécifier le nom du service de publication utilisé
-pour l'échange de messages sur le bus XMPP. Ce nom de service est généralement
-de la forme ``pubsub.<hôte>`` où ``<hôte>`` correspond au nom de l'hôte sur
-lequel ejabberd fonctionne (indiqué par l'option « host »).
-
-Identifiant Jabber
-^^^^^^^^^^^^^^^^^^
-Chaque connecteur de Vigilo est associé à un compte Jabber différent et possède
-donc son propre JID. L'option « jid » permet d'indiquer le JID à utiliser pour
-se connecter au serveur Jabber.
-
-Mot de passe du compte Jabber
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-L'option « password » permet de spécifier le mot de passe associé au compte
-Jabber indiqué dans l'option « jid ».
-
-Politique de gestion des connexions sécurisées
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Les connecteurs ont la possibilité de spécifier la politique de sécurité à
-appliquer pour les connexions avec le serveurs XMPP. Il est possible de forcer
-l'utilisation d'une connexion chiffrée entre le connecteur et le bus en
-positionnant l'option « require_tls » à « True ». Une erreur sera levée si le
-connecteur ne parvient pas à établir une connexion chiffrée.
-
-Lorsque cette option est positionnée à une autre valeur, le connecteur tente
-malgré tout d'établir une connexion chiffrée. Si cela est impossible, le
-connecteur ne déclenche pas d'erreur mais bascule automatiquement vers
-l'utilisation d'une connexion en clair au bus XMPP.
-
-Politique de gestion de la compression des données
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Les connecteurs ont la possibilité de spécifier si les échanges XMPP seront
-compressés. Il est possible de forcer l'utilisation de la compression entre le
-connecteur et le bus en positionnant l'option « require_compression » à
-« True ». Une erreur est levée si le connecteur ne parvient pas à mettre en
-place la compression lors des premiers échanges.
-
-Lorsque les deux options « require_tls » et « require_compression » sont à
-« True », un message d'avertissement est inscrit dans les fichiers de log, et
-le connecteur utilisera le chiffrement.
-
-Liste des nœuds XMPP auxquels le connecteur est abonné
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-L'option « subscriptions » contient la liste des nœuds XMPP auxquels le
-connecteur est abonné (séparés par des virgules), c'est-à-dire les nœuds pour
-lesquels il recevra des messages lorsqu'un autre composant de Vigilo publie des
-données. La valeur proposée par défaut lors de l'installation du connecteur
-convient généralement à tous les types d'usages.
-
-La valeur spéciale « , » (une virgule seule) permet d'indiquer que le
-connecteur n'est abonné à aucun nœud (par exemple, dans le cas où le connecteur
-se contente d'écrire des informations sur le bus, sans jamais en recevoir).
-
-Nœud d'envoi des informations sur le statut du connecteur
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-Les connecteurs de Vigilo sont capables de s'auto-superviser, c'est-à-dire que
-des alertes peuvent être émises par Vigilo concernant ses propres connecteurs
-lorsque le fonctionnement de ceux-ci est perturbé ou en défaut.
-
-Ce mécanisme est rendu possible grâce à des signaux de vie émis par les
-connecteurs à intervalle régulier. Chaque signal de vie correspond à un message
-de type « state ».
-
-L'option « status_node » permet de choisir le nœud XMPP vers lequel les
-messages de survie du connecteur sont envoyés. Dans le cas où cette option ne
-serait pas renseignée, les nœuds de publication sont utilisés pour déterminer
-le nœud de destination des messages. Si aucun nœud de publication n'est trouvé
-pour l'envoi des messages de vie, un message d'erreur est enregistré dans les
-journaux d'événements.
-
+.. Documenter ici les sections spécifiques au connecteur
 
 Configuration spécifique au connecteur de métrologie
 ----------------------------------------------------
@@ -239,19 +107,6 @@ Emplacement de l'outil « rrdtool »
 L'option « rrd_bin » donne l'emplacement de l'outil « rrdtool » sur le système.
 Une valeur adéquate est « /usr/bin/rrdtool » car il s'agit de l'emplacement par
 défaut de cet outil sur la plupart des distributions Linux.
-
-
-Configuration des journaux
---------------------------
-Le module connector-metro est capable de transmettre un certain nombre
-d'informations au cours de son fonctionnement à un mécanisme de journalisation
-des événements (par exemple, des journaux systèmes, une trace dans un fichier,
-un enregistrement des événements en base de données, etc.).
-
-Le document Vigilo - Journaux d'événements décrit spécifiquement la
-configuration de la journalisation des événements au sein de toutes les
-applications de Vigilo, y compris les connecteurs.
-
 
 
 Administration du service
@@ -293,33 +148,11 @@ suivante en tant que super-utilisateur::
 Annexes
 =======
 
-.. TODO
-.. Annexe : Messages d’erreurs/d’alerte/d’informations
-.. ---------------------------------------------------
-.. 
-.. Ce chapitre recense les messages d'erreurs les plus courants que vous êtes
-.. susceptibles de rencontrer, ainsi que la méthode de résolution de ces
-.. problèmes.
-.. 
-
-Annexe : Glossaire - Terminologie
----------------------------------
-
-Ce chapitre recense les différents termes techniques employés dans ce document
-et donne une brève définition de chacun de ces termes.
-
-XML
-    eXtensible Markup Language. Langage de balisage extensible.
-
-XMPP
-    eXtensible Messaging and Presense Protocol. Protocole de messagerie
-    instantanée pour l'envoi de textes courts au format XML.
+.. include:: ../../connector/doc/glossaire.rst
 
 RRD
     Round-Robin Database. Base de données circulaire permettant de stocker des
     données disposant d'une granularité différente.
 
 
-
 .. vim: set tw=79 :
-
