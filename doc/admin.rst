@@ -70,7 +70,7 @@ par défaut dans ``/etc/vigilo/connector-metro/settings.ini``.
 .. Lister ici les sections spécifiques au connecteur
 
 connector-metro
-    Contient les options spécifiques au connecteur metro.                     |
+    Contient les options spécifiques au connecteur metro.
 
 .. include:: ../../connector/doc/admin-conf-2.rst
 
