@@ -70,6 +70,7 @@ class MetroConnectorServiceMaker(object):
                         servicename=servicename,
                         node=settings["connector"].get("status_node", None))
         stats_publisher.setHandlerParent(xmpp_client)
+        presence_manager.registerStatusPublisher(stats_publisher)
 
         root_service = service.MultiService()
         xmpp_client.setServiceParent(root_service)
