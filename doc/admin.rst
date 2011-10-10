@@ -149,9 +149,5 @@ Annexes
 
 .. include:: ../../connector/doc/glossaire.rst
 
-RRD
-    Round-Robin Database. Base de données circulaire permettant de stocker des
-    données disposant d'une granularité différente.
-
 
 .. vim: set tw=79 :
