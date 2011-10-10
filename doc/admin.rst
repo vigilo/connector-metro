@@ -44,8 +44,7 @@ Installation à l'aide de yum::
 Création du compte XMPP
 -----------------------
 Le connector-metro nécessite qu'un compte soit créé sur la machine hébergeant
-le bus XMPP pour le composant. Si plusieurs instances doivent être lancées sur
-la même machine, chaque instance doit utiliser un JID différent.
+le bus XMPP pour le composant.
 
 Les comptes doivent être créés sur la machine qui héberge le serveur ejabberd,
 à l'aide de la commande::
