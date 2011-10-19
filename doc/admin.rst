@@ -2,9 +2,6 @@
 Guide d'administration
 **********************
 
-Ce document a pour objectif de présenter le fonctionnement du module
-connector-metro aux administrateurs.
-
 
 Installation
 ============
