@@ -30,7 +30,6 @@ from vigilo.connector_metro.nodetorrdtool import NodeToRRDtoolForwarder
 from vigilo.connector_metro.nodetorrdtool import NotInConfiguration
 from vigilo.connector_metro.nodetorrdtool import WrongMessageType
 from vigilo.connector_metro.nodetorrdtool import InvalidMessage
-from vigilo.connector_metro.nodetorrdtool import parse_rrdtool_response
 from vigilo.connector.converttoxml import text2xml
 from vigilo.pubsub.xml import NS_COMMAND
 
@@ -251,7 +250,7 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
             self.assertEqual(r, {
                 'queue': 0,
                 'forwarded': 0,
-                'pds_count': 3,
+                'pds_count': 4,
                 'sent': 0,
                 'illegal_updates': 0,
             })
@@ -345,9 +344,80 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         return d
 
     @deferred(timeout=30)
+    def test_alerts_unicode(self):
+        """Fonction _compare_thresholds (unicode, #884)"""
+        # Positionne l'heure courante à "42" (timestamp UNIX) systématiquement.
+        self.ntrf.get_current_time = lambda: 42
+
+        res_tpl = \
+            u"<message to='foo@bar' from='foo@bar' type='chat'><body>" \
+            u"<command xmlns='%s'>" \
+                u"<timestamp>42.000000</timestamp>" \
+                u"<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>" \
+                u"<value>Host éçà;Nagios' éçà" \
+                    u";%%(state)d;%%(msg)s</value>" \
+            u"</command>" \
+            u"</body></message>" % NS_COMMAND
+        testdata = {
+            # 0 est là pour détecter les erreurs de comparaison
+            # (if x: ... au lieu de if x is None: ...)
+            '0': res_tpl % {'state': 0, 'msg': 'OK: 0'},
+            '0.80': res_tpl % {'state': 0, 'msg': 'OK: 0.8'},
+            '0.81': res_tpl % {'state': 1, 'msg': 'WARNING: 0.81'},
+            '0.91': res_tpl % {'state': 2, 'msg': 'CRITICAL: 0.91'},
+            'nan': res_tpl % {'state': 3, 'msg': 'UNKNOWN'},
+        }
+        ds = {"hostname": u"Host éçà",
+              "datasource": u"PDS éçà",
+              "step": 300,
+              "factor": 1,
+              "warning_threshold": u"0.8",
+              "critical_threshold": u"0.9",
+              "nagiosname": u"Nagios' éçà",
+              "jid": u"foo@bar",
+              }
+
+        def check_result(dummy, value, expected):
+            print "Checking results for value %r" % value
+            print [el.toXml() for el in self.stub.output]
+            if value == "nan":
+                # Une valeur UNKNOWN ne doit pas générer d'alerte
+                # (on utilise la direction freshness_threshold de Nagios).
+                self.assertEquals(0, len(self.stub.output),
+                    "Pas d'alerte pour un état UNKNOWN")
+            else:
+                self.assertTrue(len(self.stub.output) > 0)
+                self.assertEquals(expected, self.stub.output[-1].toXml())
+            # On vide la file de message pour permettre
+            # la vérification suivante dans ce test.
+            self.stub.output = []
+
+        # Ne pas utiliser une DeferredList, ou alors avec les paramètres
+        # fireOnOneErrback=True et consumeErrors=True
+        # (mais ça fait de moins belles erreurs)
+        d = defer.succeed(None)
+        tpl = "DS\n\ntimestamp: %s\n"
+        for value, expected in testdata.iteritems():
+            d.addCallback(lambda x: self.ntrf._compare_thresholds(tpl % value, ds))
+            d.addCallback(check_result, value, expected)
+        return d
+
+    @deferred(timeout=30)
     def test_no_check_thresholds(self):
         """Désactivation de la vérification des seuils"""
         xml = text2xml("perf|1165939739|server1.example.com|Load|12")
+        self.ntrf.must_check_thresholds = False
+        self.ntrf._get_last_value = Mock()
+        d = self.ntrf.processMessage(xml)
+        def check_not_called(_r):
+            self.assertFalse(self.ntrf._get_last_value.called)
+        d.addCallback(check_not_called)
+        return d
+
+    @deferred(timeout=30)
+    def test_no_check_thresholds_unicode(self):
+        """Désactivation de la vérification des seuils (unicode, #884)"""
+        xml = text2xml("perf|1165939739|Host éçà|PDS éçà|12")
         self.ntrf.must_check_thresholds = False
         self.ntrf._get_last_value = Mock()
         d = self.ntrf.processMessage(xml)
@@ -379,39 +449,26 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         d.addCallback(check_no_rrdcached)
         return d
 
-class RRDToolParserTestCase(unittest.TestCase):
-
-    def test_empty(self):
-        """Sortie de RRDTool: vide"""
-        self.assertTrue(parse_rrdtool_response("") is None)
-
-    def test_only_nan(self):
-        """Sortie de RRDTool: uniquement des NaN"""
-        output = "123456789: nan\n"
-        self.assertTrue(parse_rrdtool_response(output) is None)
-
-    def test_simple(self):
-        """Sortie de RRDTool: cas simple"""
-        output = "123456789: 42\n"
-        self.assertEqual(parse_rrdtool_response(output), 42)
-
-    def test_useless_data(self):
-        """Les données inutiles doivent être ignorées"""
-        output = "  useless data   \n123456789: 42\n"
-        self.assertEqual(parse_rrdtool_response(output), 42)
-
-    def test_exponent(self):
-        """Gestion des valeurs avec exposants"""
-        output = "123456789: 4.2e2\n"
-        self.assertEqual(parse_rrdtool_response(output), 420.0)
-
-    def test_choose_last(self):
-        """Il faut choisir la dernière valeur"""
-        output = "123456789: 41\n123456789: 42\n"
-        self.assertEqual(parse_rrdtool_response(output), 42)
-
-    def test_ignore_nan(self):
-        """Les lignes avec NaN doivent être ignorées"""
-        output = "123456789: 42\n123456789: nan\n"
-        self.assertEqual(parse_rrdtool_response(output), 42)
-
+    @deferred(timeout=30)
+    def test_no_rrdcached_unicode(self):
+        """Ne pas utiliser RRDCached s'il y a des seuils (unicode, #884)"""
+        rrdfile = os.path.join(settings['connector-metro']['rrd_base_dir'],
+                               "Host%20%C3%A9%C3%A7%C3%A0",
+                               "PDS%20%C3%A9%C3%A7%C3%A0.rrd")
+        xml = text2xml("perf|1165939739|Host éçà|PDS éçà|12")
+        self.ntrf.createRRD = Mock(name="createRRD")
+        self.ntrf.createRRD.side_effect = lambda x, y: defer.succeed(None)
+        if not os.path.exists(os.path.dirname(rrdfile)):
+            os.makedirs(os.path.dirname(rrdfile))
+        open(rrdfile, "w").close() # touch
+        self.ntrf.rrdtool.run = Mock(name="run")
+        self.ntrf.rrdtool.run.side_effect = lambda *a, **kw: defer.succeed(None)
+        d = self.ntrf.processMessage(xml)
+        def check_no_rrdcached(r):
+            print self.ntrf.rrdtool.run.call_args_list
+            for cmd in self.ntrf.rrdtool.run.call_args_list:
+                print cmd
+                self.assertTrue("no_rrdcached" in cmd[1])
+                self.assertTrue(cmd[1]["no_rrdcached"])
+        d.addCallback(check_no_rrdcached)
+        return d

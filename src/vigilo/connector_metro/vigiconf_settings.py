@@ -16,7 +16,6 @@ LOGGER = get_logger(__name__)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-
 class NoConfDBError(Exception):
     pass
 
@@ -87,7 +86,8 @@ class ConfDB(object):
             return defer.succeed([])
         result = self._db.runQuery("SELECT DISTINCT hostname FROM "
                                    "perfdatasource")
-        result.addCallback(lambda results: [str(r[0]) for r in results])
+        # Pas de conversion en UTF-8 : has_host() attend de l'unicode.
+        result.addCallback(lambda results: [r[0] for r in results])
         def cache_hosts(hosts):
             self._cache["hosts"] = hosts
             return hosts
@@ -100,7 +100,8 @@ class ConfDB(object):
         result = self._db.runQuery("SELECT hostname, name FROM perfdatasource "
                                    "WHERE warning_threshold IS NOT NULL "
                                    "AND critical_threshold IS NOT NULL")
-        result.addCallback(lambda results: [(r[0], r[1]) for r in results])
+        # Pas de conversion en UTF-8 : has_threshold() attend de l'unicode.
+        result.addCallback(lambda results: [ (r[0], r[1]) for r in results ])
         def cache_thresholds(thresholds):
             self._cache["has_threshold"] = thresholds
             return thresholds
@@ -122,7 +123,7 @@ class ConfDB(object):
             return defer.succeed([])
         result = self._db.runQuery("SELECT name FROM perfdatasource WHERE "
                                    "hostname = ?", (hostname,))
-        result.addCallback(lambda results: [str(r[0]) for r in results])
+        result.addCallback(lambda results: [unicode(r[0]) for r in results])
         return result
 
     def has_threshold(self, hostname, dsname):
@@ -160,7 +161,7 @@ class ConfDB(object):
                                % (dsname, hostname))
             d = {}
             for propindex, propname in enumerate(properties):
-                d[propname] = str(result[0][propindex])
+                d[propname] = unicode(result[0][propindex])
                 if (propname == "min" or propname == "max") \
                         and d[propname] == 'None': # hum hum...
                     d[propname] = "U"
@@ -185,7 +186,7 @@ class ConfDB(object):
             for row in rows:
                 rra = {}
                 for propindex, propname in enumerate(properties):
-                    rra[propname] = str(row[propindex])
+                    rra[propname] = unicode(row[propindex])
                 rras.append(rra)
             return rras
         result.addCallback(format_result, properties)

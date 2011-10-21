@@ -173,7 +173,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                 ).encode('utf-8')))
         perf = {}
         for c in msg.children:
-            perf[str(c.name)] = str(c.children[0])
+            perf[str(c.name)] = unicode(c.children[0])
 
         for i in 'timestamp', 'value', 'host', 'datasource':
             if i not in perf:
@@ -183,7 +183,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                         errormsg % {"tag": i}
                     ).encode('utf-8')))
 
-        if perf["value"] != "U":
+        if perf["value"] != u"U":
             try:
                 float(perf["value"])
             except ValueError:
@@ -238,8 +238,11 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         if os.path.exists(filename):
             return defer.succeed(msgdata)
         # compatibilité
-        old_filename = os.path.join(self.rrd_base_dir, msgdata["host"], "%s.rrd"
-                                    % urllib.quote_plus(msgdata["datasource"]))
+        old_filename = os.path.join(
+            self.rrd_base_dir,
+            msgdata["host"].encode('utf-8'),
+            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
+        )
         if os.path.isfile(old_filename):
             os.rename(old_filename, filename)
             return defer.succeed(msgdata)
@@ -366,13 +369,13 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
 
     def _compare_thresholds(self, last, ds):
         # Modèle pour la commande à envoyer à Nagios.
-        tpl =   u'<%(onetoone)s to="%(recipient)s">'\
-                '<command xmlns="%(namespace)s">'\
-                    '<timestamp>%(timestamp)f</timestamp>'\
-                    '<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>'\
-                    '<value>%(host)s;%(service)s;%(state)d;%(msg)s</value>'\
-                '</command>'\
-                '</%(onetoone)s>'
+        tpl =   u'<%(onetoone)s to="%(recipient)s">' \
+                u'<command xmlns="%(namespace)s">' \
+                    u'<timestamp>%(timestamp)f</timestamp>' \
+                    u'<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>' \
+                    u'<value>%(host)s;%(service)s;%(state)d;%(msg)s</value>' \
+                u'</command>' \
+                u'</%(onetoone)s>'
 
         # Substitutions pour le template.
         params = {
@@ -461,4 +464,3 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             return defer.succeed(None)
         else:
             return self.publishXml(item)
-
