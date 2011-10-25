@@ -208,7 +208,8 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         """
         self.working = True
         assert self.deferred is None, \
-                _("The process has not yet completed the previous job")
+                    _("The process has not yet completed the previous job"
+                     ).encode("utf8") # unicode interdit
         self.deferred = defer.Deferred()
         def state_finish(r):
             self.working = False
@@ -222,7 +223,8 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         complete_cmd = "%s %s %s" % (command, filename, args)
         #LOGGER.debug('Running this command: %s' % complete_cmd)
         try:
-            self.transport.write("%s\n" % complete_cmd)
+            # attention, unicode interdit
+            self.transport.write("%s\n" % complete_cmd.encode("utf8"))
         except Exception, e:
             self.working = False
             return defer.fail(e)
