@@ -103,7 +103,7 @@ case "$1" in
         stop
     ;;
     status)
-        status -p $PID_FILE $NAME
+        status -p $PID_FILE ${NAME}${NUM}
     ;;
     reload)
         reload
