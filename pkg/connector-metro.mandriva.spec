@@ -118,6 +118,8 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_localstatedir}/lib/vigilo
 %attr(755,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/rrd
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
+%dir %{_localstatedir}/log/vigilo
+%attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/log/vigilo/%{module}
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/%{name}
 
 %files -n vigilo-rrdcached
