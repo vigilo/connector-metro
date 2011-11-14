@@ -117,13 +117,13 @@ keys = consoleFormatter,syslogFormatter
 
 [logger_root]
 level = INFO
-handlers = syslog,console
+handlers = syslog,console,errors
 
 [logger_twisted]
 level = WARNING
 qualname = twisted
 propagate = 0
-handlers = syslog,console
+handlers = syslog,console,errors
 
 [handler_console]
 class = StreamHandler
