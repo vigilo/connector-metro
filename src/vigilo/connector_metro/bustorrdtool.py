@@ -4,46 +4,51 @@
 
 """
 Ce module fournit un demi-connecteur capable de lire des messages
-depuis un bus XMPP pour les stocker dans une base de données RRDtool.
+depuis un bus pour les stocker dans une base de données RRDtool.
 """
+
+from __future__ import absolute_import
+
 import os
 import stat
 import time
 import signal
 import urllib
 
-from lxml import etree
 from twisted.internet import defer
-from wokkel.generic import parseXml
 
-from vigilo.common.conf import settings
-from vigilo.pubsub.xml import NS_COMMAND
+from vigilo.connector.client import MessageHandler
 
 from vigilo.common.logging import get_logger
+LOGGER = get_logger(__name__)
+
 from vigilo.common.gettext import translate
+_ = translate(__name__)
+
 from vigilo.common import get_rrd_path
 
-from vigilo.connector.forwarder import PubSubListener, PubSubSender
-from vigilo.connector import MESSAGEONETOONE
 from vigilo.connector_metro.rrdtool import RRDToolManager, RRDToolError
 from vigilo.connector_metro.vigiconf_settings import ConfDB
 from vigilo.connector_metro.threshold import is_out_of_bounds
 
-LOGGER = get_logger(__name__)
-_ = translate(__name__)
 
 
 class NotInConfiguration(KeyError):
     pass
 
+
 class InvalidMessage(ValueError):
     pass
+
 
 class WrongMessageType(Exception):
     pass
 
+
 class CreationError(Exception):
     pass
+
+
 
 def parse_rrdtool_response(response):
     value = None
@@ -58,14 +63,18 @@ def parse_rrdtool_response(response):
         value = float(value) # python convertit tout seul la notation exposant
     return value
 
-class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
+
+
+class BusToRRDtool(MessageHandler):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
     """
     get_current_time = time.time
 
-    def __init__(self, confdb_path):
+
+    def __init__(self, confdb_path, rrd_base_dir, rrd_path_mode,
+                 must_check_thresholds):
         """
         Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
@@ -74,14 +83,12 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             configuration en provenance de VigiConf
         @type  confdb_path: C{str}
         """
-
-        super(NodeToRRDtoolForwarder, self).__init__() # pas de db de backup
-        self.rrd_base_dir = settings['connector-metro']['rrd_base_dir']
-        try:
-            self.must_check_thresholds = \
-                    settings['connector-metro'].as_bool('check_thresholds')
-        except KeyError:
-            self.must_check_thresholds = True
+        super(BusToRRDtool, self).__init__()
+        self.rrd_base_dir = rrd_base_dir
+        self.rrd_path_mode = rrd_path_mode
+        self.must_check_thresholds = must_check_thresholds
+        # Publication des résultats des comparaisons sur le bus
+        self.publisher = None
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
@@ -92,10 +99,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         # Sous-processus
         self.rrdtool = RRDToolManager(
                             check_thresholds=self.must_check_thresholds)
-        self.max_send_simult = self.rrdtool.computePoolSize()
         self._illegal_updates = 0
         # Tests unitaires
         self._check_thresholds_synchronously = False
+
 
     def connectionInitialized(self):
         """
@@ -103,10 +110,112 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         c'est-à-dire lorsque la connexion a réussi et que les échanges
         initiaux (handshakes) sont terminés.
         """
-        super(NodeToRRDtoolForwarder, self).connectionInitialized()
+        super(BusToRRDtool, self).connectionInitialized()
         self.rrdtool.start()
         # On réinitialise le compteur à chaque connexion établie avec succès.
         self._illegal_updates = 0
+
+
+    def _get_msg_filename(self, msgdata):
+        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
+                                self.rrd_base_dir, self.rrd_path_mode)
+        return filename
+
+
+    def isConnected(self):
+        """Sauf cas exceptionnel, on est toujours connecté"""
+        return self.rrdtool.started
+
+
+    def processMessage(self, msg):
+        """
+        Transmet un message reçu du bus à RRDtool.
+
+        Attention, c'est complexe parce qu'on a pas le droit d'utiliser
+        inlineDeferred (sinon le yield qui est fait sur le résultat de cette
+        fonction ne servira à rien et on va manger de la RAM comme des gorets
+        en consommant la file d'attente)
+
+        @param msg: Message à transmettre
+        @type msg: C{twisted.words.test.domish Xml}
+        """
+        d = self._parse_message(msg)
+        d.addCallbacks(self._create_if_needed, self._eb)
+        d.addCallback(self._check_has_thresholds)
+        d.addCallbacks(self._run_rrdtool, self._eb)
+        d.addErrback(self._eb_rrdtool)
+        d.addCallback(self._check_thresholds)
+        return d
+
+
+    def _parse_message(self, msg):
+        if msg.name != 'perf':
+            errormsg = _("'%(msgtype)s' is not a valid message type for "
+                         "metrology")
+            return defer.fail(WrongMessageType((
+                    errormsg % {'msgtype' : msg.name}
+                ).encode('utf-8')))
+        perf = {}
+        for c in msg.children:
+            perf[str(c.name)] = unicode(c.children[0])
+
+        for i in 'timestamp', 'value', 'host', 'datasource':
+            if i not in perf:
+                errormsg = _(u"Not a valid performance message (missing "
+                              "'%(tag)s' tag)")
+                return defer.fail(InvalidMessage((
+                        errormsg % {"tag": i}
+                    ).encode('utf-8')))
+
+        if perf["value"] != u"U":
+            try:
+                float(perf["value"])
+            except ValueError:
+                return defer.fail(InvalidMessage((
+                        _("Invalid metrology value: %s") % perf["value"]
+                    ).encode('utf-8')))
+
+        d = self.confdb.has_host(perf["host"])
+        def cb(isinconf, perf):
+            if not isinconf:
+                return defer.fail(NotInConfiguration((
+                        _("Skipping perf update for host %s") % perf["host"]
+                    ).encode('utf-8')))
+            return perf
+        d.addCallback(cb, perf)
+        return d
+
+
+    def _create_if_needed(self, perf):
+        """
+        La création du deferred et le addCallbacks sont là pour propager
+        le message de perf plutôt que le résultat de la fonction
+        create_if_needed
+        """
+        d = defer.Deferred()
+        create_d = self.create_if_needed(perf)
+        create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
+        return d
+
+
+    def create_if_needed(self, msgdata):
+        """Création du RRD si besoin"""
+        filename = self._get_msg_filename(msgdata)
+        if os.path.exists(filename):
+            return defer.succeed(msgdata)
+        # compatibilité
+        old_filename = os.path.join(
+            self.rrd_base_dir,
+            msgdata["host"].encode('utf-8'),
+            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
+        )
+        if os.path.isfile(old_filename):
+            os.rename(old_filename, filename)
+            return defer.succeed(msgdata)
+        else:
+            # création
+            return self.createRRD(filename, msgdata)
+
 
     @defer.inlineCallbacks
     def createRRD(self, filename, perf):
@@ -164,42 +273,6 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                      stat.S_IRUSR | stat.S_IWUSR |
                      stat.S_IRGRP | stat.S_IROTH )
 
-    def _parse_message(self, msg):
-        if msg.name != 'perf':
-            errormsg = _("'%(msgtype)s' is not a valid message type for "
-                         "metrology")
-            return defer.fail(WrongMessageType((
-                    errormsg % {'msgtype' : msg.name}
-                ).encode('utf-8')))
-        perf = {}
-        for c in msg.children:
-            perf[str(c.name)] = unicode(c.children[0])
-
-        for i in 'timestamp', 'value', 'host', 'datasource':
-            if i not in perf:
-                errormsg = _(u"Not a valid performance message (missing "
-                              "'%(tag)s' tag)")
-                return defer.fail(InvalidMessage((
-                        errormsg % {"tag": i}
-                    ).encode('utf-8')))
-
-        if perf["value"] != u"U":
-            try:
-                float(perf["value"])
-            except ValueError:
-                return defer.fail(InvalidMessage((
-                        _("Invalid metrology value: %s") % perf["value"]
-                    ).encode('utf-8')))
-
-        d = self.confdb.has_host(perf["host"])
-        def cb(isinconf, perf):
-            if not isinconf:
-                return defer.fail(NotInConfiguration((
-                        _("Skipping perf update for host %s") % perf["host"]
-                    ).encode('utf-8')))
-            return perf
-        d.addCallback(cb, perf)
-        return d
 
     def _makedirs(self, directory):
         # Création du dossier si besoin
@@ -225,54 +298,6 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                 LOGGER.error(_("Unable to create the directory '%s'"), cur_dir)
                 raise e
 
-    def _get_msg_filename(self, msgdata):
-        rrd_dir = settings['connector-metro']['rrd_base_dir']
-        rrd_path_mode = settings['connector-metro']['rrd_path_mode']
-        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
-                                rrd_dir, rrd_path_mode)
-        return filename
-
-    def create_if_needed(self, msgdata):
-        """Création du RRD si besoin"""
-        filename = self._get_msg_filename(msgdata)
-        if os.path.exists(filename):
-            return defer.succeed(msgdata)
-        # compatibilité
-        old_filename = os.path.join(
-            self.rrd_base_dir,
-            msgdata["host"].encode('utf-8'),
-            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
-        )
-        if os.path.isfile(old_filename):
-            os.rename(old_filename, filename)
-            return defer.succeed(msgdata)
-        else:
-            # création
-            return self.createRRD(filename, msgdata)
-
-    def isConnected(self):
-        """Sauf cas exceptionnel, on est toujours connecté"""
-        return self.rrdtool.started
-
-    def processMessage(self, msg):
-        """
-        Transmet un message reçu du bus à RRDtool.
-
-        Attention, c'est complexe parce qu'on a pas le droit d'utiliser
-        inlineDeferred (sinon le yield qui est fait sur le résultat de cette
-        fonction ne servira à rien et on va manger de la RAM comme des gorets
-        en consommant la file d'attente)
-
-        @param msg: Message à transmettre
-        @type msg: C{twisted.words.test.domish Xml}
-        """
-        d = self._parse_message(msg)
-        d.addCallbacks(self._create_if_needed, self._eb)
-        d.addCallback(self._check_has_thresholds)
-        d.addCallbacks(self._run_rrdtool, self._eb)
-        d.addErrback(self._eb_rrdtool)
-        d.addCallback(self._check_thresholds)
-        return d
 
     def _eb(self, f):
         err_class = f.trap(InvalidMessage, WrongMessageType,
@@ -285,16 +310,6 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             #LOGGER.debug(str(f.value))
         return None
 
-    def _create_if_needed(self, perf):
-        """
-        La création du deferred et le addCallbacks sont là pour propager
-        le message de perf plutôt que le résultat de la fonction
-        create_if_needed
-        """
-        d = defer.Deferred()
-        create_d = self.create_if_needed(perf)
-        create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
-        return d
 
     def _check_has_thresholds(self, perf):
         """Ajoute au message l'information de la présence d'un seuil"""
@@ -310,6 +325,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         d.addCallback(extend_has_th, perf)
         return d
 
+
     def _run_rrdtool(self, perf):
         if perf is None:
             return None
@@ -321,6 +337,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                               no_rrdcached=perf["has_thresholds"])
         d2.addCallback(lambda x: perf)
         return d2
+
 
     def _eb_rrdtool(self, f):
         f.trap(RRDToolError)
@@ -337,16 +354,21 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                      'filename': f.value.filename,
                      'msg': error_msg })
 
+
     def _check_thresholds(self, perf, sync=False):
         if perf is None:
             return None
-        if not self.must_check_thresholds or not perf["has_thresholds"]:
+        if (not self.must_check_thresholds or
+            not perf["has_thresholds"] or
+            not self.publisher.isConnected()):
+            # si non connecté, on ne stocke pas (info éphémère)
             return perf
         ds = self.confdb.get_datasource(perf["host"], perf["datasource"],
                                         cache=True)
         ds.addCallback(self._get_last_value, perf)
         if self._check_thresholds_synchronously:
             return ds
+
 
     def _get_last_value(self, ds, perf):
         # simple précaution, redondant avec self.confdb.has_threshold
@@ -367,6 +389,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         last.addCallback(self._compare_thresholds, ds)
         return last
 
+
     def _compare_thresholds(self, last, ds):
         # Modèle pour la commande à envoyer à Nagios.
         tpl =   u'<%(onetoone)s to="%(recipient)s">' \
@@ -377,14 +400,10 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
                 u'</command>' \
                 u'</%(onetoone)s>'
 
-        # Substitutions pour le template.
-        params = {
-            'namespace': NS_COMMAND,
+        message = {
+            'type': "command",
             'timestamp': self.get_current_time(),
-            'host': ds['hostname'],
-            'service': ds['nagiosname'],
-            'onetoone': MESSAGEONETOONE,
-            'recipient': ds['jid'],
+            'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
         }
 
         # La réponse de rrdtool est de la forme " DS\n\ntimestamp: value\n"
@@ -406,20 +425,21 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
 
         try:
             if is_out_of_bounds(last, ds['critical_threshold']):
-                params['state'] = 2 # CRITICAL dans Nagios
-                params['msg'] = 'CRITICAL: %s' % last
+                status = (2, 'CRITICAL: %s' % last)
             elif is_out_of_bounds(last, ds['warning_threshold']):
-                params['state'] = 1 # WARNING dans Nagios
-                params['msg'] = 'WARNING: %s' % last
+                status = (1, 'WARNING: %s' % last)
             else:
-                params['state'] = 0 # OK dans Nagios
-                params['msg'] = 'OK: %s' % last
+                status = (0, 'OK: %s' % last)
         except ValueError, e:
             # Le seuil configuré est invalide.
-            params['state'] = 3 # UNKNOWN dans Nagios
-            params['msg'] = 'UNKNOWN: Invalid threshold configuration (%s)' % e
+            status = (3, 'UNKNOWN: Invalid threshold configuration (%s)' % e)
 
-        return self.sendItem(tpl % params)
+        message["value"] = ";".join((ds['hostname'], ds['nagiosname'],
+                                     status[0], status[1]))
+
+        self._messages_sent += 1
+        return self.publisher.write(message)
+
 
     def _sighup_handler(self, signum, frames):
         """
@@ -437,30 +457,53 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         if callable(self._prev_sighup_handler):
             self._prev_sighup_handler(signum, frames)
 
+
     @defer.inlineCallbacks
     def getStats(self):
         """Récupère des métriques de fonctionnement du connecteur"""
-        stats = yield super(NodeToRRDtoolForwarder, self).getStats()
+        stats = yield super(BusToRRDtool, self).getStats()
         ds_count = yield self.confdb.count_datasources()
         stats["pds_count"] = ds_count
         stats["illegal_updates"] = self._illegal_updates
         defer.returnValue(stats)
 
-    def stop(self):
-        """
-        Utilisée par les tests
-        """
+
+    def stopService(self):
         if self._task_process_queue.running:
             self._task_process_queue.stop()
         self.confdb.stop()
         self.rrdtool.stop()
 
-    def sendItem(self, item):
-        self._messages_sent += 1
-        if not isinstance(item, etree.ElementBase):
-            item = parseXml(item.encode('utf-8'))
-        if item.name == MESSAGEONETOONE:
-            self.sendOneToOneXml(item)
-            return defer.succeed(None)
-        else:
-            return self.publishXml(item)
+
+
+
+def bustorrdtool_factory(settings, client):
+    try:
+        conffile = settings['connector-metro']['config']
+    except KeyError:
+        LOGGER.error(_("Please set the path to the configuration "
+            "database generated by VigiConf in the settings.ini."))
+        sys.exit(1)
+
+    queue = settings["bus"]["queue"]
+    rrd_base_dir = settings['connector-metro']['rrd_base_dir']
+    rrd_path_mode = settings['connector-metro']['rrd_path_mode']
+    try:
+        must_check_thresholds = \
+                settings['connector-metro'].as_bool('check_thresholds')
+    except KeyError:
+        must_check_thresholds = True
+
+    btr = BusToRRDtool(conffile, rrd_base_dir, rrd_path_mode,
+                       must_check_thresholds)
+    btr.setClient(client)
+
+    # Envoi des messages vers Nagios
+    bus_publisher = buspublisher_factory(settings, client)
+    btr.publisher = bus_publisher
+    # on ne fait pas un registerProducer parce qu'on se sait pas se mettre en
+    # pause
+
+    btr.susbcribe(queue)
+    return btr
+
