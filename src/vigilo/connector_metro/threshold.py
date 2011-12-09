@@ -10,6 +10,9 @@ Il s'agit d'un port d'une partie du code du collector.
 
 import time
 
+from zope.interface import implements
+from twisted.internet.interfaces import IPushProducer
+
 
 
 class ThresholdChecker(object):
@@ -17,6 +20,8 @@ class ThresholdChecker(object):
     Reçoit des données de métrologie (performances) depuis le bus XMPP
     et les transmet à RRDtool pour générer des base de données RRD.
     """
+
+    implements(IPushProducer)
     get_current_time = time.time
 
 
