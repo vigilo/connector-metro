@@ -17,19 +17,15 @@ import urllib
 
 from twisted.internet import defer
 
-from vigilo.connector.client import MessageHandler
-
 from vigilo.common.logging import get_logger
 LOGGER = get_logger(__name__)
 
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-from vigilo.common import get_rrd_path
+from vigilo.connector.client import MessageHandler
 
-from vigilo.connector_metro.rrdtool import RRDToolManager, RRDToolError
-from vigilo.connector_metro.vigiconf_settings import ConfDB
-from vigilo.connector_metro.threshold import is_out_of_bounds
+from vigilo.connector_metro.rrdtool import RRDToolError
 
 
 
@@ -50,21 +46,6 @@ class CreationError(Exception):
 
 
 
-def parse_rrdtool_response(response):
-    value = None
-    for line in response.split("\n"):
-        if not line.count(": ") == 1:
-            continue
-        timestamp, current_value = line.strip().split(": ")
-        if current_value == "nan":
-            continue
-        value = current_value
-    if value is not None:
-        value = float(value) # python convertit tout seul la notation exposant
-    return value
-
-
-
 class BusToRRDtool(MessageHandler):
     """
     Reçoit des données de métrologie (performances) depuis le bus XMPP
@@ -73,8 +54,7 @@ class BusToRRDtool(MessageHandler):
     get_current_time = time.time
 
 
-    def __init__(self, confdb_path, rrd_base_dir, rrd_path_mode,
-                 must_check_thresholds):
+    def __init__(self, confdb, rrdtool, threshold_checker):
         """
         Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
@@ -84,24 +64,15 @@ class BusToRRDtool(MessageHandler):
         @type  confdb_path: C{str}
         """
         super(BusToRRDtool, self).__init__()
-        self.rrd_base_dir = rrd_base_dir
-        self.rrd_path_mode = rrd_path_mode
-        self.must_check_thresholds = must_check_thresholds
-        # Publication des résultats des comparaisons sur le bus
-        self.publisher = None
+        self.confdb = confdb
+        self.rrdtool = rrdtool
+        self.threshold_checker = threshold_checker
         # Sauvegarde du handler courant pour SIGHUP
         # et ajout de notre propre handler pour recharger
         # le connecteur (lors d'un service ... reload).
         self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
         signal.signal(signal.SIGHUP, self._sighup_handler)
-        # Configuration
-        self.confdb = ConfDB(confdb_path)
-        # Sous-processus
-        self.rrdtool = RRDToolManager(
-                            check_thresholds=self.must_check_thresholds)
         self._illegal_updates = 0
-        # Tests unitaires
-        self._check_thresholds_synchronously = False
 
 
     def connectionInitialized(self):
@@ -110,16 +81,9 @@ class BusToRRDtool(MessageHandler):
         c'est-à-dire lorsque la connexion a réussi et que les échanges
         initiaux (handshakes) sont terminés.
         """
-        super(BusToRRDtool, self).connectionInitialized()
         self.rrdtool.start()
         # On réinitialise le compteur à chaque connexion établie avec succès.
         self._illegal_updates = 0
-
-
-    def _get_msg_filename(self, msgdata):
-        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
-                                self.rrd_base_dir, self.rrd_path_mode)
-        return filename
 
 
     def isConnected(self):
@@ -198,107 +162,6 @@ class BusToRRDtool(MessageHandler):
         return d
 
 
-    def create_if_needed(self, msgdata):
-        """Création du RRD si besoin"""
-        filename = self._get_msg_filename(msgdata)
-        if os.path.exists(filename):
-            return defer.succeed(msgdata)
-        # compatibilité
-        old_filename = os.path.join(
-            self.rrd_base_dir,
-            msgdata["host"].encode('utf-8'),
-            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
-        )
-        if os.path.isfile(old_filename):
-            os.rename(old_filename, filename)
-            return defer.succeed(msgdata)
-        else:
-            # création
-            return self.createRRD(filename, msgdata)
-
-
-    @defer.inlineCallbacks
-    def createRRD(self, filename, perf):
-        """
-        Crée un nouveau fichier RRD avec la configuration adéquate.
-
-        @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
-            doit être encodé avec urllib.quote_plus (RFC 1738).
-        @type  filename: C{str}
-        @param perf: Dictionnaire décrivant la source de données, contenant les
-            clés suivantes :
-             - C{host}: Nom de l'hôte.
-             - C{datasource}: Nom de l'indicateur.
-             - C{timestamp}: Timestamp UNIX de la mise à jour.
-        @type perf: C{dict}
-        """
-        # to avoid an error just after creating the rrd file :
-        # (minimum one second step)
-        # the creation and updating time needs to be different.
-        timestamp = int(perf["timestamp"]) - 10
-        basedir = os.path.dirname(filename)
-        self._makedirs(basedir)
-        host = perf["host"]
-        ds_name = perf["datasource"]
-        ds_list = yield self.confdb.get_host_datasources(host)
-        if ds_name not in ds_list:
-            LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
-                            "in the configuration !"), {
-                                'host': host,
-                                'ds': ds_name,
-                        })
-            raise NotInConfiguration()
-
-        ds = yield self.confdb.get_datasource(host, ds_name)
-        rrd_cmd = ["--step", str(ds["step"]), "--start", str(timestamp)]
-        rras = yield self.confdb.get_rras(ds["id"])
-        for rra in rras:
-            rrd_cmd.append("RRA:%s:%s:%s:%s" %
-                           (rra["type"], rra["xff"],
-                            rra["step"], rra["rows"]))
-
-        rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
-                       (ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
-
-        try:
-            yield self.rrdtool.run("create", filename, rrd_cmd)
-        except Exception, e:
-            LOGGER.error(_("RRDtool could not create the file: "
-                           "%(filename)s. Message: %(msg)s"),
-                         { 'filename': filename,
-                           'msg': e })
-            raise CreationError()
-        else:
-            os.chmod(filename, # chmod 644
-                     stat.S_IRUSR | stat.S_IWUSR |
-                     stat.S_IRGRP | stat.S_IROTH )
-
-
-    def _makedirs(self, directory):
-        # Création du dossier si besoin
-        if os.path.exists(directory):
-            return
-        if not directory.startswith(self.rrd_base_dir):
-            raise ValueError("Directory %s is not in the RRD directory"
-                             % directory)
-        tocreate = directory[len(self.rrd_base_dir)+1:]
-        cur_dir = self.rrd_base_dir
-        for subdir in tocreate.split(os.sep):
-            cur_dir = os.path.join(cur_dir, subdir)
-            if os.path.exists(cur_dir):
-                continue
-            try:
-                os.mkdir(cur_dir)
-                # l'option 'mode' de mkdir respecte l'umask, dommage
-                os.chmod(cur_dir, # chmod 755
-                         stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR | \
-                         stat.S_IRGRP | stat.S_IXGRP | \
-                         stat.S_IROTH | stat.S_IXOTH)
-            except OSError, e:
-                LOGGER.error(_("Unable to create the directory '%s'"), cur_dir)
-                raise e
-
-
     def _eb(self, f):
         err_class = f.trap(InvalidMessage, WrongMessageType,
                            NotInConfiguration, CreationError)
@@ -315,24 +178,17 @@ class BusToRRDtool(MessageHandler):
         """Ajoute au message l'information de la présence d'un seuil"""
         if perf is None:
             return None
-        if not self.must_check_thresholds:
+        if self.threshold_checker is None:
             perf["has_thresholds"] = False
             return perf
-        d = self.confdb.has_threshold(perf["host"], perf["datasource"])
-        def extend_has_th(result, perf):
-            perf["has_thresholds"] = result
-            return perf
-        d.addCallback(extend_has_th, perf)
-        return d
+        return self.threshold_checker.hasThreshold(perf)
 
 
     def _run_rrdtool(self, perf):
         if perf is None:
             return None
         cmd = '%(timestamp)s:%(value)s' % perf
-        filename = self._get_msg_filename(perf)
-        basedir = os.path.dirname(filename)
-        self._makedirs(basedir)
+        filename = self.rrdtool.getFilename(perf)
         d2 = self.rrdtool.run("update", filename, cmd,
                               no_rrdcached=perf["has_thresholds"])
         d2.addCallback(lambda x: perf)
@@ -358,87 +214,10 @@ class BusToRRDtool(MessageHandler):
     def _check_thresholds(self, perf, sync=False):
         if perf is None:
             return None
-        if (not self.must_check_thresholds or
-            not perf["has_thresholds"] or
-            not self.publisher.isConnected()):
-            # si non connecté, on ne stocke pas (info éphémère)
+        if (self.threshold_checker is None or
+                not perf["has_thresholds"]):
             return perf
-        ds = self.confdb.get_datasource(perf["host"], perf["datasource"],
-                                        cache=True)
-        ds.addCallback(self._get_last_value, perf)
-        if self._check_thresholds_synchronously:
-            return ds
-
-
-    def _get_last_value(self, ds, perf):
-        # simple précaution, redondant avec self.confdb.has_threshold
-        attrs = [
-            'warning_threshold',
-            'critical_threshold',
-            'nagiosname',
-            'jid',
-        ]
-        for attr in attrs:
-            if ds[attr] is None:
-                return
-        # récupération de la dernière valeur enregistrée
-        filename = self._get_msg_filename(perf)
-        last = self.rrdtool.run("fetch", filename,
-                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
-                    no_rrdcached=True)
-        last.addCallback(self._compare_thresholds, ds)
-        return last
-
-
-    def _compare_thresholds(self, last, ds):
-        # Modèle pour la commande à envoyer à Nagios.
-        tpl =   u'<%(onetoone)s to="%(recipient)s">' \
-                u'<command xmlns="%(namespace)s">' \
-                    u'<timestamp>%(timestamp)f</timestamp>' \
-                    u'<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>' \
-                    u'<value>%(host)s;%(service)s;%(state)d;%(msg)s</value>' \
-                u'</command>' \
-                u'</%(onetoone)s>'
-
-        message = {
-            'type': "command",
-            'timestamp': self.get_current_time(),
-            'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
-        }
-
-        # La réponse de rrdtool est de la forme " DS\n\ntimestamp: value\n"
-        # en cas de succès et "" en cas d'erreur.
-        # On s'arrange pour récupérer uniquement la valeur.
-        if not last:
-            return
-
-        last = parse_rrdtool_response(last)
-        if last is None:
-            return
-
-        last *= float(ds['factor'])
-
-        # Si la dernière valeur est entière,
-        # on la représente comme telle.
-        if int(last) == last:
-            last = int(last)
-
-        try:
-            if is_out_of_bounds(last, ds['critical_threshold']):
-                status = (2, 'CRITICAL: %s' % last)
-            elif is_out_of_bounds(last, ds['warning_threshold']):
-                status = (1, 'WARNING: %s' % last)
-            else:
-                status = (0, 'OK: %s' % last)
-        except ValueError, e:
-            # Le seuil configuré est invalide.
-            status = (3, 'UNKNOWN: Invalid threshold configuration (%s)' % e)
-
-        message["value"] = ";".join((ds['hostname'], ds['nagiosname'],
-                                     status[0], status[1]))
-
-        self._messages_sent += 1
-        return self.publisher.write(message)
+        return self.threshold_checker.checkMessage(perf)
 
 
     def _sighup_handler(self, signum, frames):
@@ -469,41 +248,5 @@ class BusToRRDtool(MessageHandler):
 
 
     def stopService(self):
-        if self._task_process_queue.running:
-            self._task_process_queue.stop()
         self.confdb.stop()
         self.rrdtool.stop()
-
-
-
-
-def bustorrdtool_factory(settings, client):
-    try:
-        conffile = settings['connector-metro']['config']
-    except KeyError:
-        LOGGER.error(_("Please set the path to the configuration "
-            "database generated by VigiConf in the settings.ini."))
-        sys.exit(1)
-
-    queue = settings["bus"]["queue"]
-    rrd_base_dir = settings['connector-metro']['rrd_base_dir']
-    rrd_path_mode = settings['connector-metro']['rrd_path_mode']
-    try:
-        must_check_thresholds = \
-                settings['connector-metro'].as_bool('check_thresholds')
-    except KeyError:
-        must_check_thresholds = True
-
-    btr = BusToRRDtool(conffile, rrd_base_dir, rrd_path_mode,
-                       must_check_thresholds)
-    btr.setClient(client)
-
-    # Envoi des messages vers Nagios
-    bus_publisher = buspublisher_factory(settings, client)
-    btr.publisher = bus_publisher
-    # on ne fait pas un registerProducer parce qu'on se sait pas se mettre en
-    # pause
-
-    btr.susbcribe(queue)
-    return btr
-

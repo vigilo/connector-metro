@@ -45,7 +45,6 @@ setup(name='vigilo-connector-metro',
             'setuptools',
             'vigilo-common',
             'vigilo-connector',
-            'lxml',
             ],
         namespace_packages = [
             'vigilo',

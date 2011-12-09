@@ -11,17 +11,19 @@ Gestion d'un process RRDTool pour écrire ou lire des RRDs.
 
 import os
 import stat
+import urllib
 
 from twisted.internet import reactor, protocol, defer
 from twisted.internet.error import ProcessDone, ProcessTerminated
 
-from vigilo.common.conf import settings
+from vigilo.common import get_rrd_path
 
 from vigilo.common.logging import get_logger
 LOGGER = get_logger(__name__, silent_load=True)
 
 from vigilo.common.gettext import translate
 _ = translate(__name__)
+
 
 
 class NoAvailableProcess(Exception):
@@ -31,46 +33,169 @@ class NoAvailableProcess(Exception):
     """
     pass
 
+
 class RRDToolError(Exception):
     """Erreur à l'exécution de RRDTool"""
     def __init__(self, filename, message):
         Exception.__init__(self, message)
         self.filename = filename
 
+
+
+class RRDToolCreator(object):
+
+    def __init__(self, rrdtool, confdb):
+        self.rrdtool = rrdtool
+        self.confdb = confdb
+
+
+    def createIfNeeded(self, msgdata):
+        """Création du RRD si besoin"""
+        filename = self.rrdtool.getFilename(msgdata)
+        if os.path.exists(filename):
+            return defer.succeed(msgdata)
+        # compatibilité
+        old_filename = self.rrdtool.getOldFilename(msgdata)
+        if os.path.isfile(old_filename):
+            os.rename(old_filename, filename)
+            return defer.succeed(msgdata)
+        else:
+            # création
+            return self.createRRD(filename, msgdata)
+
+
+    @defer.inlineCallbacks
+    def createRRD(self, filename, perf):
+        """
+        Crée un nouveau fichier RRD avec la configuration adéquate.
+
+        @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
+            doit être encodé avec urllib.quote_plus (RFC 1738).
+        @type  filename: C{str}
+        @param perf: Dictionnaire décrivant la source de données, contenant les
+            clés suivantes :
+             - C{host}: Nom de l'hôte.
+             - C{datasource}: Nom de l'indicateur.
+             - C{timestamp}: Timestamp UNIX de la mise à jour.
+        @type perf: C{dict}
+        """
+        # to avoid an error just after creating the rrd file :
+        # (minimum one second step)
+        # the creation and updating time needs to be different.
+        timestamp = int(perf["timestamp"]) - 10
+        basedir = os.path.dirname(filename)
+        self.rrdtool.makedirs(basedir)
+        host = perf["host"]
+        ds_name = perf["datasource"]
+        ds_list = yield self.confdb.get_host_datasources(host)
+        if ds_name not in ds_list:
+            LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
+                            "in the configuration !"), {
+                                'host': host,
+                                'ds': ds_name,
+                        })
+            raise NotInConfiguration()
+
+        ds = yield self.confdb.get_datasource(host, ds_name)
+        rrd_cmd = ["--step", str(ds["step"]), "--start", str(timestamp)]
+        rras = yield self.confdb.get_rras(ds["id"])
+        for rra in rras:
+            rrd_cmd.append("RRA:%s:%s:%s:%s" %
+                           (rra["type"], rra["xff"],
+                            rra["step"], rra["rows"]))
+
+        rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
+                       (ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
+
+        try:
+            yield self.rrdtool.run("create", filename, rrd_cmd)
+        except Exception, e:
+            LOGGER.error(_("RRDtool could not create the file: "
+                           "%(filename)s. Message: %(msg)s"),
+                         { 'filename': filename,
+                           'msg': e })
+            raise CreationError()
+        else:
+            os.chmod(filename, # chmod 644
+                     stat.S_IRUSR | stat.S_IWUSR |
+                     stat.S_IRGRP | stat.S_IROTH )
+
+
+
 class RRDToolManager(object):
     """
-    Lance une instance de RRDTool en mode démon dans un sous-processus et le
-    redémarre s'il s'arrête.
+    Gère l'interaction avec RRDTool, c'est à dire avec le pool de process et
+    les aspects filesystem.
     """
 
-    def __init__(self, readonly=False, check_thresholds=True):
+
+    def __init__(self, rrd_base_dir, rrd_path_mode, rrd_bin,
+                 check_thresholds=True, rrdcached=None, pool_size=None,
+                 readonly=False):
+        self.rrd_base_dir = rrd_base_dir
+        self.rrd_path_mode = rrd_path_mode
+        self.rrd_bin = rrd_bin
         self.readonly = readonly
         self.job_count = 0
         self.started = False
         self.pool = None
         self.pool_direct = None
-        self.createPools(check_thresholds)
+        self.createPools(check_thresholds, rrdcached, pool_size)
 
-    def createPools(self, check_thresholds):
-        rrdcached = settings["connector-metro"].get("rrdcached", None)
-        pool_size = self.computePoolSize()
-        self.pool = RRDToolPool(pool_size, rrdcached=rrdcached)
-        if rrdcached and check_thresholds:
-            # On créé un petit pool sans RRDcached
-            self.pool_direct = RRDToolPool(1)
 
-    def computePoolSize(self):
-        try:
-            pool_size = settings["connector-metro"].as_int("rrd_processes")
-        except KeyError:
-            pool_size = None
+    def createPools(self, check_thresholds, rrdcached, pool_size):
         if pool_size is None:
             # POSIX seulement: http://www.boduch.ca/2009/06/python-cpus.html
             pool_size = int(os.sysconf('SC_NPROCESSORS_ONLN'))
             if pool_size > 4:
                 # on limite, sinon on passe trop de temps à choisir
                 pool_size = 4
-        return pool_size
+        self.pool = RRDToolPool(pool_size, self.rrd_bin, rrdcached=rrdcached)
+        if rrdcached and check_thresholds:
+            # On créé un petit pool sans RRDcached
+            self.pool_direct = RRDToolPool(1)
+
+
+    def getFilename(self, msgdata):
+        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
+                                self.rrd_base_dir, self.rrd_path_mode)
+        return filename
+
+    def getOldFilename(self, msgdata):
+        old_filename = os.path.join(
+            self.rrd_base_dir,
+            msgdata["host"].encode('utf-8'),
+            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
+        )
+
+
+    def makedirs(self, directory):
+        # Création du dossier si besoin
+        if os.path.exists(directory):
+            return
+        if not directory.startswith(self.rrd_base_dir):
+            raise ValueError("Directory %s is not in the RRD directory"
+                             % directory)
+        tocreate = directory[len(self.rrd_base_dir)+1:]
+        cur_dir = self.rrd_base_dir
+        for subdir in tocreate.split(os.sep):
+            cur_dir = os.path.join(cur_dir, subdir)
+            if os.path.exists(cur_dir):
+                continue
+            self._mkdir(cur_dir)
+
+
+    def _mkdir(self, directory):
+        try:
+            os.makedirs(directory)
+            os.chmod(directory, # chmod 755
+                     stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |\
+                     stat.S_IRGRP | stat.S_IXGRP | \
+                     stat.S_IROTH | stat.S_IXOTH)
+        except OSError, e:
+            LOGGER.error(_("Unable to create the directory '%s'"), e.filename)
+            raise e
+
 
     def start(self):
         """
@@ -79,7 +204,7 @@ class RRDToolManager(object):
         if self.started:
             return defer.succeed(None)
         try:
-            self.ensureDirectory(settings['connector-metro']['rrd_base_dir'])
+            self.ensureDirectory(self.rrd_base_dir)
             self.checkBinary()
         except OSError, e:
             return defer.fail(e)
@@ -92,6 +217,7 @@ class RRDToolManager(object):
         d.addCallback(flag_started)
         return d
 
+
     def stop(self):
         d = self.pool.stop()
         if self.pool_direct is not None:
@@ -101,17 +227,18 @@ class RRDToolManager(object):
         d.addCallback(flag_stopped)
         return d
 
+
     def checkBinary(self):
-        rrd_bin = settings['connector-metro']['rrd_bin']
-        if not os.path.isfile(rrd_bin):
+        if not os.path.isfile(self.rrd_bin):
             raise OSError(_('Unable to start "%(rrdtool)s". Make sure the '
-                            'path is correct.') % {'rrdtool': rrd_bin})
-        if not os.access(rrd_bin, os.X_OK):
+                            'path is correct.') % {'rrdtool': self.rrd_bin})
+        if not os.access(self.rrd_bin, os.X_OK):
             raise OSError(_('Unable to start "%(rrdtool)s". Make sure '
                             'RRDtool is installed and you have '
                             'permissions to use it.') % {
-                                'rrdtool': rrd_bin,
+                                'rrdtool': self.rrd_bin,
                             })
+
 
     def ensureDirectory(self, directory):
         """
@@ -122,19 +249,11 @@ class RRDToolManager(object):
             if self.readonly:
                 raise OSError(_("The RRD directory does not exist: %s"),
                               directory)
-            try:
-                os.makedirs(directory)
-                os.chmod(directory, # chmod 755
-                         stat.S_IRUSR|stat.S_IWUSR|stat.S_IXUSR |\
-                         stat.S_IRGRP | stat.S_IXGRP | \
-                         stat.S_IROTH | stat.S_IXOTH)
-            except OSError, e:
-                raise OSError((_("Unable to create directory '%(dir)s'") % {
-                                'dir': e.filename,
-                            }).encode('utf-8'))
+            self._mkdir(directory)
         if not self.readonly and not os.access(directory, os.W_OK):
             raise OSError((_("Unable to write in the directory '%(dir)s'") %
                     {'dir': directory}).encode('utf-8'))
+
 
     def run(self, command, filename, args, no_rrdcached=False):
         """
@@ -160,7 +279,9 @@ class RRDToolManager(object):
         return d
 
 
+
 class RRDToolProcessProtocol(protocol.ProcessProtocol):
+
 
     def __init__(self, rrd_bin, env=None):
         self.rrd_bin = rrd_bin
@@ -176,6 +297,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         else:
             self.env = env
 
+
     def start(self):
         if self.transport is not None:
             return defer.succeed(self.transport.pid)
@@ -185,11 +307,13 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                              env=self.env)
         return self.deferred_start
 
+
     def connectionMade(self):
         if self.deferred_start is not None:
             LOGGER.info(_("Started RRDtool subprocess: pid %(pid)d"),
                           {'pid': self.transport.pid})
             self.deferred_start.callback(self.transport.pid)
+
 
     def run(self, command, filename, args):
         """
@@ -230,6 +354,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             return defer.fail(e)
         return self.deferred
 
+
     def outReceived(self, data):
         self._current_data.append(data)
         if data.count("OK ") == 0 and data.count("ERROR: ") == 0:
@@ -237,8 +362,10 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         data = "".join(self._current_data)
         return self._handle_result(data)
 
+
     def errReceived(self, data):
         return self.outReceived(data)
+
 
     def _handle_result(self, data):
         self._current_data = []
@@ -255,6 +382,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
                 break
             self._current_data.append(line)
 
+
     def quit(self):
         self._keep_alive = False
         self.deferred_stop = defer.Deferred()
@@ -265,6 +393,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         else:
             return defer.succeed(None)
         #self.transport.signalProcess('TERM')
+
 
     def processEnded(self, reason):
         if isinstance(reason.value, ProcessDone):
@@ -283,6 +412,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         self.start()
 
 
+
 class RRDToolPool(object):
     """
     Gestionnaire de pool de processus RRDTool, interface bas-niveau
@@ -290,8 +420,9 @@ class RRDToolPool(object):
 
     processProtocolFactory = RRDToolProcessProtocol
 
-    def __init__(self, size, rrdcached=None):
+    def __init__(self, size, rrd_bin, rrdcached=None):
         self.size = size
+        self.rrd_bin = rrd_bin
         self.rrdcached = rrdcached
         self.pool = []
         self._lock = defer.DeferredSemaphore(self.size)
@@ -304,12 +435,11 @@ class RRDToolPool(object):
         return self.pool.__iter__()
 
     def build(self):
-        rrd_bin = settings['connector-metro']['rrd_bin']
         env = {}
         if self.rrdcached:
             env["RRDCACHED_ADDRESS"] = self.rrdcached
         for i in range(self.size):
-            self.pool.append(self.processProtocolFactory(rrd_bin, env))
+            self.pool.append(self.processProtocolFactory(self.rrd_bin, env))
 
     def start(self):
         if not self.pool:
