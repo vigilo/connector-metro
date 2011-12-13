@@ -24,11 +24,12 @@ def makeService(options):
     _ = translate(__name__)
 
     from vigilo.connector.client import client_factory
-    from vigilo.connector.forwarder import buspublisher_factory
+    from vigilo.connector.handlers import buspublisher_factory
     from vigilo.connector.status import statuspublisher_factory
 
-    from vigilo.connector_metro.rrdtool import RRDToolManager, RRDToolCreator
-    from vigilo.connector_metro.vigiconf_settings import ConfDB
+    from vigilo.connector_metro.rrdtool import RRDToolPoolManager
+    from vigilo.connector_metro.rrdtool import RRDToolManager
+    from vigilo.connector_metro.confdb import ConfDB
     from vigilo.connector_metro.threshold import ThresholdChecker
     from vigilo.connector_metro.bustorrdtool import BusToRRDtool
 
@@ -61,16 +62,14 @@ def makeService(options):
         pool_size = settings["connector-metro"].as_int("rrd_processes")
     except KeyError:
         pool_size = None
-    rrdtool = RRDToolManager(rrd_base_dir, rrd_path_mode, rrd_bin,
+    rrdtool_pool = RRDToolPoolManager(rrd_base_dir, rrd_path_mode, rrd_bin,
                              check_thresholds=must_check_th,
                              rrdcached=rrdcached, pool_size=pool_size)
-
-    # Création des RRDs manquants
-    rrdtool_creator = RRDToolCreator(rrdtool, confdb)
+    rrdtool = RRDToolManager(rrdtool_pool, confdb)
 
     # Gestion des seuils
     if must_check_th:
-        threshold_checker = ThresholdChecker(rrdtool, confdb)
+        threshold_checker = ThresholdChecker(rrdtool_pool, confdb)
         bus_publisher = buspublisher_factory(settings, client)
         bus_publisher.registerProducer(threshold_checker, streaming=True)
     else:

@@ -7,6 +7,7 @@
 from __future__ import absolute_import
 
 import os
+import signal
 
 from twisted.internet import defer, task
 from twisted.enterprise import adbapi
@@ -16,8 +17,12 @@ LOGGER = get_logger(__name__)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
+
+
 class NoConfDBError(Exception):
     pass
+
+
 
 class ConfDB(object):
     """
@@ -27,23 +32,32 @@ class ConfDB(object):
     @type _db: C{twisted.enterprise.adbapi.ConnectionPool}
     """
 
+
     def __init__(self, path):
         self.path = path
         self._db = None
         self._timestamp = 0
         self._reload_task = task.LoopingCall(self.reload)
         self._cache = {"hosts": None, "has_threshold": None, "ds": {}}
-        self.start()
+
+        # Sauvegarde du handler courant pour SIGHUP
+        # et ajout de notre propre handler pour recharger
+        # le connecteur (lors d'un service ... reload).
+        self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
+        signal.signal(signal.SIGHUP, self._sighup_handler)
+
 
     def start(self):
         if not self._reload_task.running:
             self._reload_task.start(10) # toutes les 10s
+
 
     def stop(self):
         if self._reload_task.running:
             self._reload_task.stop()
         if self._db is not None:
             self._db.close()
+
 
     def start_db(self):
         if not os.path.exists(self.path):
@@ -55,6 +69,24 @@ class ConfDB(object):
                                          check_same_thread=False)
         LOGGER.debug("Connected to the configuration database")
         self._rebuild_cache()
+
+
+    def _sighup_handler(self, signum, frames):
+        """
+        Gestionnaire du signal SIGHUP: recharge la conf.
+
+        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
+        @type signum: C{int} ou C{None}
+        @param frames: Frames d'exécution interrompues par le signal.
+        @type frames: C{list}
+        """
+        LOGGER.info(_("Received signal to reload the configuration"))
+        self.reload()
+        # On appelle le précédent handler s'il y en a un.
+        # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
+        if callable(self._prev_sighup_handler):
+            self._prev_sighup_handler(signum, frames)
+
 
     def reload(self):
         """
@@ -74,12 +106,14 @@ class ConfDB(object):
         self._timestamp = current_timestamp
         self._rebuild_cache()
 
+
     def _rebuild_cache(self):
         self._cache["hosts"] = None
         self._cache["has_threshold"] = None
         self._cache["ds"] = {}
         self.get_hosts()
         self.list_thresholds()
+
 
     def get_hosts(self):
         if self._db is None:
@@ -93,6 +127,7 @@ class ConfDB(object):
             return hosts
         result.addCallback(cache_hosts)
         return result
+
 
     def list_thresholds(self):
         if self._db is None:
@@ -108,6 +143,7 @@ class ConfDB(object):
         result.addCallback(cache_thresholds)
         return result
 
+
     def has_host(self, hostname):
         if self._db is None:
             return defer.succeed(False)
@@ -118,6 +154,7 @@ class ConfDB(object):
         result.addCallback(lambda results: bool(results[0][0]))
         return result
 
+
     def get_host_datasources(self, hostname):
         if self._db is None:
             return defer.succeed([])
@@ -125,6 +162,7 @@ class ConfDB(object):
                                    "hostname = ?", (hostname,))
         result.addCallback(lambda results: [unicode(r[0]) for r in results])
         return result
+
 
     def has_threshold(self, hostname, dsname):
         if self._db is None:
@@ -140,6 +178,7 @@ class ConfDB(object):
                                    (hostname, dsname))
         result.addCallback(lambda results: bool(len(results)))
         return result
+
 
     def get_datasource(self, hostname, dsname, cache=False):
         properties = ["id", "type", "step", "heartbeat",
@@ -173,6 +212,7 @@ class ConfDB(object):
         result.addCallback(format_result, properties)
         return result
 
+
     def get_rras(self, dsid):
         if self._db is None:
             return defer.succeed([])
@@ -191,6 +231,7 @@ class ConfDB(object):
             return rras
         result.addCallback(format_result, properties)
         return result
+
 
     def count_datasources(self):
         if self._db is None:

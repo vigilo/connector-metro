@@ -12,7 +12,6 @@ from __future__ import absolute_import
 import os
 import stat
 import time
-import signal
 import urllib
 
 from twisted.internet import defer
@@ -23,26 +22,13 @@ LOGGER = get_logger(__name__)
 from vigilo.common.gettext import translate
 _ = translate(__name__)
 
-from vigilo.connector.client import MessageHandler
+from vigilo.connector.handlers import MessageHandler
 
 from vigilo.connector_metro.rrdtool import RRDToolError
-
-
-
-class NotInConfiguration(KeyError):
-    pass
-
-
-class InvalidMessage(ValueError):
-    pass
-
-
-class WrongMessageType(Exception):
-    pass
-
-
-class CreationError(Exception):
-    pass
+from vigilo.connector_metro.exceptions import InvalidMessage
+from vigilo.connector_metro.exceptions import WrongMessageType
+from vigilo.connector_metro.exceptions import CreationError
+from vigilo.connector_metro.exceptions import NotInConfiguration
 
 
 
@@ -67,11 +53,6 @@ class BusToRRDtool(MessageHandler):
         self.confdb = confdb
         self.rrdtool = rrdtool
         self.threshold_checker = threshold_checker
-        # Sauvegarde du handler courant pour SIGHUP
-        # et ajout de notre propre handler pour recharger
-        # le connecteur (lors d'un service ... reload).
-        self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
-        signal.signal(signal.SIGHUP, self._sighup_handler)
         self._illegal_updates = 0
 
 
@@ -88,7 +69,7 @@ class BusToRRDtool(MessageHandler):
 
     def isConnected(self):
         """Sauf cas exceptionnel, on est toujours connecté"""
-        return self.rrdtool.started
+        return self.rrdtool.isStarted()
 
 
     def processMessage(self, msg):
@@ -104,9 +85,9 @@ class BusToRRDtool(MessageHandler):
         @type msg: C{twisted.words.test.domish Xml}
         """
         d = self._parse_message(msg)
-        d.addCallbacks(self._create_if_needed, self._eb)
+        d.addCallbacks(self.rrdtool.createIfNeeded, self._eb)
         d.addCallback(self._check_has_thresholds)
-        d.addCallbacks(self._run_rrdtool, self._eb)
+        d.addCallbacks(self.rrdtool.processMessage, self._eb)
         d.addErrback(self._eb_rrdtool)
         d.addCallback(self._check_thresholds)
         return d
@@ -150,18 +131,6 @@ class BusToRRDtool(MessageHandler):
         return d
 
 
-    def _create_if_needed(self, perf):
-        """
-        La création du deferred et le addCallbacks sont là pour propager
-        le message de perf plutôt que le résultat de la fonction
-        create_if_needed
-        """
-        d = defer.Deferred()
-        create_d = self.create_if_needed(perf)
-        create_d.addCallbacks(lambda x: d.callback(perf), d.errback)
-        return d
-
-
     def _eb(self, f):
         err_class = f.trap(InvalidMessage, WrongMessageType,
                            NotInConfiguration, CreationError)
@@ -182,17 +151,6 @@ class BusToRRDtool(MessageHandler):
             perf["has_thresholds"] = False
             return perf
         return self.threshold_checker.hasThreshold(perf)
-
-
-    def _run_rrdtool(self, perf):
-        if perf is None:
-            return None
-        cmd = '%(timestamp)s:%(value)s' % perf
-        filename = self.rrdtool.getFilename(perf)
-        d2 = self.rrdtool.run("update", filename, cmd,
-                              no_rrdcached=perf["has_thresholds"])
-        d2.addCallback(lambda x: perf)
-        return d2
 
 
     def _eb_rrdtool(self, f):
@@ -220,23 +178,6 @@ class BusToRRDtool(MessageHandler):
         return self.threshold_checker.checkMessage(perf)
 
 
-    def _sighup_handler(self, signum, frames):
-        """
-        Gestionnaire du signal SIGHUP: recharge la conf.
-
-        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
-        @type signum: C{int} ou C{None}
-        @param frames: Frames d'exécution interrompues par le signal.
-        @type frames: C{list}
-        """
-        LOGGER.info(_("Received signal to reload the configuration"))
-        self.confdb.reload()
-        # On appelle le précédent handler s'il y en a un.
-        # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
-        if callable(self._prev_sighup_handler):
-            self._prev_sighup_handler(signum, frames)
-
-
     @defer.inlineCallbacks
     def getStats(self):
         """Récupère des métriques de fonctionnement du connecteur"""
@@ -247,6 +188,10 @@ class BusToRRDtool(MessageHandler):
         defer.returnValue(stats)
 
 
+    def startService(self):
+        self.confdb.start()
+        return self.rrdtool.start()
+
     def stopService(self):
         self.confdb.stop()
-        self.rrdtool.stop()
+        return self.rrdtool.stop()

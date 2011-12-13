@@ -9,9 +9,10 @@ from StringIO import StringIO
 
 from twisted.internet import defer
 
-from vigilo.connector_metro.rrdtool import RRDToolManager
+from vigilo.connector_metro.rrdtool import RRDToolPoolManager
 
-class RRDToolManagerStub(RRDToolManager):
+
+class RRDToolPoolManagerStub(RRDToolPoolManager):
     """
     On a pas le droit de lancer des sous-processus dans un test unitaire, sous
     peine de les voir se transformer en zombies. Le virus vient de
@@ -19,14 +20,16 @@ class RRDToolManagerStub(RRDToolManager):
     thread, et qu'il n'installe pas les gestionnaires de signaux (SIGCHLD)
     @see: U{http://twistedmatrix.com/pipermail/twisted-python/2007-February/014782.html}
     """
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         self.commands = []
-        super(RRDToolManagerStub, self).__init__()
+        super(RRDToolPoolManagerStub, self).__init__(*args, **kwargs)
 
-    def createPools(self, check_thresholds):
-        super(RRDToolManagerStub, self).createPools(check_thresholds)
+    def createPools(self, check_thresholds, rrdcached, pool_size):
+        super(RRDToolPoolManagerStub, self).createPools(check_thresholds,
+                    rrdcached, pool_size)
         self.pool.processProtocolFactory = \
                 lambda *a: RRDToolProcessProtocolStub(self.commands)
+
 
 class RRDToolProcessProtocolStub(object):
     def __init__(self, commands):
@@ -41,6 +44,7 @@ class RRDToolProcessProtocolStub(object):
         print "Running: %s on %s with %r" % (command, filename, args)
         open(filename, "w").close() # touch filename
         return defer.succeed("")
+
 
 class TransportStub(StringIO):
     pid = 42

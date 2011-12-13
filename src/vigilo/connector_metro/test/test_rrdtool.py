@@ -27,45 +27,176 @@ from twisted.internet import defer
 from twisted.python.failure import Failure
 from twisted.internet.error import ProcessDone, ProcessTerminated
 
-from vigilo.common.conf import settings
-settings.load_module(__name__)
-
 from vigilo.connector_metro.rrdtool import RRDToolManager
+from vigilo.connector_metro.rrdtool import RRDToolPoolManager
 from vigilo.connector_metro.rrdtool import RRDToolProcessProtocol
 from vigilo.connector_metro.rrdtool import RRDToolError
+from vigilo.connector_metro.confdb import ConfDB
+from vigilo.connector_metro.exceptions import NotInConfiguration
 
 from vigilo.connector_metro.test.helpers import TransportStub
 
+
+
 class RRDToolManagerTestCase(unittest.TestCase):
+
+
+    def setUp(self):
+        self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
+        self.rrd_base_dir = os.path.join(self.tmpdir, "rrds")
+        os.mkdir(self.rrd_base_dir)
+
+        confdb = ConfDB(os.path.join(os.path.dirname(__file__),
+                                     "connector-metro.db"))
+        confdb.start_db()
+        rrdtool = Mock()
+        rrdtool.run.side_effect = lambda *a, **kw: defer.succeed(None)
+        rrdtool.rrd_base_dir = self.rrd_base_dir
+        rrdtool.rrd_path_mode = "flat"
+        self.mgr = RRDToolManager(rrdtool, confdb)
+        self.mgr._fixperms = Mock()
+
+    def tearDown(self):
+        rmtree(self.tmpdir)
+
+
+    @deferred(timeout=30)
+    def test_create_needed(self):
+        msg = { "type": "perf",
+                "timestamp": "1165939739",
+                "host": "server1.example.com",
+                "datasource": "Load",
+                "value": "12",
+                }
+        d = self.mgr.createIfNeeded(msg)
+        def check(_ignored):
+            print self.mgr.rrdtool.run.call_args_list
+            self.assertEqual(len(self.mgr.rrdtool.run.call_args_list), 1)
+            self.assertEqual(self.mgr.rrdtool.run.call_args_list[0][0],
+                    ('create', self.rrd_base_dir+"/server1.example.com/Load.rrd",
+                    ['--step', '300', '--start', '1165939729',
+                     'RRA:AVERAGE:0.5:1:600', 'RRA:AVERAGE:0.5:6:700',
+                     'RRA:AVERAGE:0.5:24:775', 'RRA:AVERAGE:0.5:288:732',
+                     'DS:DS:GAUGE:600:U:U']))
+        d.addCallback(check)
+        return d
+
+
+    @deferred(timeout=30)
+    def test_already_created(self):
+        """Pas de création si le fichier existe déjà"""
+        rrdfile = os.path.join(self.rrd_base_dir,
+                               "server1.example.com", "Load.rrd")
+        os.makedirs(os.path.dirname(rrdfile))
+        open(rrdfile, "w").close()
+        msg = { "type": "perf",
+                "timestamp": "123456789",
+                "host": "server1.example.com",
+                "datasource": "Load",
+                "value": "42",
+                }
+        d = self.mgr.createIfNeeded(msg)
+        def check(r):
+            self.assertFalse(self.mgr.rrdtool.run.called)
+        d.addCallback(check)
+        return d
+
+
+    @deferred(timeout=30)
+    def test_update(self):
+        msg = { "type": "perf",
+                "timestamp": "1165939739",
+                "host": "server1.example.com",
+                "datasource": "Load",
+                "value": "12",
+                "has_thresholds": False,
+                }
+        #self.mgr.getFilename = Mock(return_value=self.rrd_base_dir+"")
+        #self.mgr.getOldFilename = Mock(return_value=self.rrd_base_dir+"")
+        d = self.mgr.processMessage(msg)
+        def check(_ignored):
+            print self.mgr.rrdtool.run.call_args_list
+            self.assertEqual(len(self.mgr.rrdtool.run.call_args_list), 1)
+            self.assertEqual(self.mgr.rrdtool.run.call_args_list[0][0],
+                     ('update', self.rrd_base_dir+"/server1.example.com/Load.rrd",
+                      '1165939739:12'))
+        d.addCallback(check)
+        return d
+
+
+    def test_special_chars_in_pds_name(self):
+        msg = { "type": "perf",
+                "timestamp": "1165939739",
+                "host": "server1.example.com",
+                "datasource": "A B/C\\D.E%F",
+                "value": "42",
+                }
+        print self.mgr.getFilename(msg)
+        expected = (self.rrd_base_dir+"/server1.example.com/"
+                    "A+B%2FC%5CD.E%25F.rrd")
+        self.assertEqual(expected, self.mgr.getFilename(msg))
+
+
+    def test_special_chars_in_host_name(self):
+        """Caractères spéciaux dans le nom de l'hôte (#454)."""
+        msg = { "type": "perf",
+                "timestamp": "1165939739",
+                "host": "A b/c.example.com",
+                "datasource": "Load",
+                "value": "42",
+                }
+        print self.mgr.getFilename(msg)
+        expected = self.rrd_base_dir+"/A+b%2Fc.example.com/Load.rrd"
+        self.assertEqual(expected, self.mgr.getFilename(msg))
+
+
+    @deferred(timeout=30)
+    def test_non_existing_host(self):
+        """Reception d'un message pour un hôte absent du fichier de conf"""
+        msg = {"type": "perf",
+               "timestamp": "123456789",
+               "host": "dummy_host",
+               "datasource": "dummy_datasource",
+               "value": "dummy_value",
+               }
+        d = self.mgr._create(self.rrd_base_dir+"/nonexistant", msg)
+        def check_failure(f):
+            if not isinstance(f.value, NotInConfiguration):
+                self.fail("Raised exeception is not of the right type (got %s)"
+                          % type(f.value))
+        d.addCallbacks(lambda x: self.fail("No exception raised"),
+                       check_failure)
+        return d
+
+
+
+class RRDToolPoolManagerTestCase(unittest.TestCase):
     """
     Test du gestionnaire de pool de processus RRDTool
     """
 
+
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
-        settings['connector-metro']['rrd_base_dir'] = \
-                os.path.join(self.tmpdir, "rrds")
-        os.mkdir(settings['connector-metro']['rrd_base_dir'])
+        self.rrd_base_dir = os.path.join(self.tmpdir, "rrds")
+        os.mkdir(self.rrd_base_dir)
 
     def tearDown(self):
         rmtree(self.tmpdir)
-        settings.reset()
-        settings.load_module(__name__)
 
 
     def test_no_binary_1(self):
         """L'exécutable rrdtool n'existe pas (checkBinary)"""
-        mgr = RRDToolManager()
-        settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
-                                                              "dummy")
+        rrd_bin = os.path.join(self.tmpdir, "dummy")
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", rrd_bin)
         self.assertRaises(OSError, mgr.checkBinary)
+
 
     @deferred(timeout=30)
     def test_no_binary_2(self):
         """L'exécutable rrdtool n'existe pas (start)"""
-        mgr = RRDToolManager()
-        settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
-                                                              "dummy")
+        rrd_bin = os.path.join(self.tmpdir, "dummy")
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", rrd_bin)
         d = mgr.start()
         def cb(r):
             self.fail("Il y aurait dû y avoir un errback")
@@ -74,21 +205,21 @@ class RRDToolManagerTestCase(unittest.TestCase):
         d.addCallbacks(cb, eb)
         return d
 
+
     def test_not_executable_1(self):
         """L'exécutable rrdtool n'est pas exécutable (checkBinary)"""
-        mgr = RRDToolManager()
-        settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
-                                                              "dummy")
-        open(settings['connector-metro']['rrd_bin'], "w").close()
+        rrd_bin = os.path.join(self.tmpdir, "dummy")
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", rrd_bin)
+        open(rrd_bin, "w").close()
         self.assertRaises(OSError, mgr.checkBinary)
+
 
     @deferred(timeout=30)
     def test_not_executable_2(self):
         """L'exécutable rrdtool n'est pas exécutable (start)"""
-        mgr = RRDToolManager()
-        settings['connector-metro']['rrd_bin'] = os.path.join(self.tmpdir,
-                                                              "dummy")
-        open(settings['connector-metro']['rrd_bin'], "w").close()
+        rrd_bin = os.path.join(self.tmpdir, "dummy")
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", rrd_bin)
+        open(rrd_bin, "w").close()
         d = mgr.start()
         def cb(r):
             self.fail("Il y aurait dû y avoir un errback")
@@ -96,14 +227,15 @@ class RRDToolManagerTestCase(unittest.TestCase):
             self.assertEqual(f.type, OSError)
         d.addCallbacks(cb, eb)
         return d
+
 
     @deferred(timeout=30)
     def test_with_rrdcached(self):
         """
         Si RRDcached est activé, la bonne variable d'env doit être propagée
         """
-        settings["connector-metro"]["rrdcached"] = self.tmpdir
-        mgr = RRDToolManager()
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", "/usr/bin/rrdtool",
+                    rrdcached=self.tmpdir)
         # Ne rien forker
         mgr.pool.build()
         mgr.pool_direct.build()
@@ -118,13 +250,14 @@ class RRDToolManagerTestCase(unittest.TestCase):
         d.addCallback(check)
         return d
 
+
     @deferred(timeout=30)
     def test_with_check_thresholds(self):
         """
         Si la vérification de seuils est activée, il faut un second pool
         """
-        settings["connector-metro"]["rrdcached"] = self.tmpdir
-        mgr = RRDToolManager(check_thresholds=True)
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", "/usr/bin/rrdtool",
+                    rrdcached=self.tmpdir)
         # Ne rien forker
         mgr.pool.build()
         mgr.pool_direct.build()
@@ -139,19 +272,21 @@ class RRDToolManagerTestCase(unittest.TestCase):
         d.addCallback(check)
         return d
 
+
     def test_without_check_thresholds(self):
         """
         Si la vérification de seuils est désactivée, pas besoin de second pool
         """
-        settings["connector-metro"]["rrdcached"] = self.tmpdir
-        mgr = RRDToolManager(check_thresholds=False)
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", "/usr/bin/rrdtool",
+                    rrdcached=self.tmpdir, check_thresholds=False)
         self.assertTrue(mgr.pool_direct is None)
+
 
     @deferred(timeout=30)
     def test_with_or_without_rrdcached(self):
         """L'argument no_rrdcached doit envoyer sur le bon pool"""
-        settings["connector-metro"]["rrdcached"] = self.tmpdir
-        mgr = RRDToolManager(check_thresholds=True)
+        mgr = RRDToolPoolManager(self.rrd_base_dir, "flat", "/usr/bin/rrdtool",
+                    rrdcached=self.tmpdir)
         mgr.pool.run = Mock(name="with")
         mgr.pool_direct.run = Mock(name="without")
         # Ne rien forker
@@ -181,9 +316,8 @@ class RRDToolProcessProtocolTest(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
-        settings['connector-metro']['rrd_base_dir'] = \
-                os.path.join(self.tmpdir, "rrds")
-        os.mkdir(settings['connector-metro']['rrd_base_dir'])
+        self.rrd_base_dir = os.path.join(self.tmpdir, "rrds")
+        os.mkdir(self.rrd_base_dir)
         self.transport = TransportStub()
         self.process = RRDToolProcessProtocol("/usr/bin/rrdtool")
         self.process.transport = self.transport

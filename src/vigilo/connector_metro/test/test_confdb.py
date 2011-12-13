@@ -23,7 +23,8 @@ from vigilo.common.conf import settings
 settings.load_module(__name__)
 from vigilo.connector.test.helpers import wait
 
-from vigilo.connector_metro.vigiconf_settings import ConfDB, NoConfDBError
+from vigilo.connector_metro.confdb import ConfDB, NoConfDBError
+
 
 
 class ConfDBTest(unittest.TestCase):
@@ -39,15 +40,12 @@ class ConfDBTest(unittest.TestCase):
         dbpath = os.path.join(self.tmpdir, "conf.db")
         copy(dbpath_orig, dbpath)
         self.confdb = ConfDB(dbpath)
-        d = wait(0.1)
-        def stop_task(r):
-            self.confdb._reload_task.stop()
-        d.addCallback(stop_task)
-        return d
+        return defer.succeed(None)
 
     def tearDown(self):
         self.confdb.stop()
         rmtree(self.tmpdir)
+
 
     @deferred(timeout=30)
     @defer.inlineCallbacks
@@ -73,6 +71,7 @@ class ConfDBTest(unittest.TestCase):
         new_hosts = yield self.confdb.get_hosts()
         self.assertNotEqual(len(old_hosts), len(new_hosts))
 
+
     @deferred(timeout=30)
     @defer.inlineCallbacks
     def test_reload_nochange(self):
@@ -85,14 +84,14 @@ class ConfDBTest(unittest.TestCase):
         new_connection_threads = set(self.confdb._db.connections.keys())
         self.assertTrue(old_connection_threads <= new_connection_threads)
 
+
     def test_nodb(self):
         """La base n'existe pas"""
         confdb = ConfDB(os.path.join(self.tmpdir, "nonexistant.db"))
         self.assertRaises(NoConfDBError, confdb.start_db)
 
+
     def test_reload_nodb(self):
         """Rechargement alors que la base n'existe pas"""
         confdb = ConfDB(os.path.join(self.tmpdir, "nonexistant.db"))
         self.assertEqual(confdb.reload(), None)
-
-

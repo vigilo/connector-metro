@@ -25,6 +25,9 @@ from vigilo.common.gettext import translate
 _ = translate(__name__)
 
 
+from vigilo.connector_metro.exceptions import CreationError
+from vigilo.connector_metro.exceptions import NotInConfiguration
+
 
 class NoAvailableProcess(Exception):
     """
@@ -42,51 +45,83 @@ class RRDToolError(Exception):
 
 
 
-class RRDToolCreator(object):
+class RRDToolManager(object):
+
 
     def __init__(self, rrdtool, confdb):
         self.rrdtool = rrdtool
         self.confdb = confdb
 
 
+    def getFilename(self, msgdata):
+        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
+                        self.rrdtool.rrd_base_dir, self.rrdtool.rrd_path_mode)
+        return filename
+
+    def getOldFilename(self, msgdata):
+        old_filename = os.path.join(
+            self.rrdtool.rrd_base_dir,
+            msgdata["host"].encode('utf-8'),
+            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
+        )
+        return old_filename
+
+
+    def processMessage(self, msgdata):
+        """
+        Traite le message et retourne msgdata pour traitements ultérieurs
+        """
+        if msgdata is None:
+            return defer.succeed(None)
+        cmd = '%(timestamp)s:%(value)s' % msgdata
+        filename = self.getFilename(msgdata)
+        d2 = self.rrdtool.run("update", filename, cmd,
+                              no_rrdcached=msgdata["has_thresholds"])
+        d2.addCallback(lambda x: msgdata)
+        return d2
+
     def createIfNeeded(self, msgdata):
-        """Création du RRD si besoin"""
-        filename = self.rrdtool.getFilename(msgdata)
+        """
+        Créé le RRD si besoin, et retourne msgdata pour traitements ultérieurs
+        """
+        filename = self.getFilename(msgdata)
         if os.path.exists(filename):
             return defer.succeed(msgdata)
         # compatibilité
-        old_filename = self.rrdtool.getOldFilename(msgdata)
+        old_filename = self.getOldFilename(msgdata)
         if os.path.isfile(old_filename):
             os.rename(old_filename, filename)
             return defer.succeed(msgdata)
         else:
             # création
-            return self.createRRD(filename, msgdata)
+            d = self._create(filename, msgdata)
+            d.addCallback(lambda _x: msgdata)
+            return d
 
 
     @defer.inlineCallbacks
-    def createRRD(self, filename, perf):
+    def _create(self, filename, msgdata):
         """
         Crée un nouveau fichier RRD avec la configuration adéquate.
 
         @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
             doit être encodé avec urllib.quote_plus (RFC 1738).
         @type  filename: C{str}
-        @param perf: Dictionnaire décrivant la source de données, contenant les
+        @param msgdata: Dictionnaire décrivant la source de données, contenant les
             clés suivantes :
              - C{host}: Nom de l'hôte.
              - C{datasource}: Nom de l'indicateur.
              - C{timestamp}: Timestamp UNIX de la mise à jour.
-        @type perf: C{dict}
+        @type msgdata: C{dict}
         """
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
         # the creation and updating time needs to be different.
-        timestamp = int(perf["timestamp"]) - 10
+        timestamp = int(msgdata["timestamp"]) - 10
         basedir = os.path.dirname(filename)
         self.rrdtool.makedirs(basedir)
-        host = perf["host"]
-        ds_name = perf["datasource"]
+        host = msgdata["host"]
+        ds_name = msgdata["datasource"]
         ds_list = yield self.confdb.get_host_datasources(host)
         if ds_name not in ds_list:
             LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
@@ -116,13 +151,30 @@ class RRDToolCreator(object):
                            'msg': e })
             raise CreationError()
         else:
-            os.chmod(filename, # chmod 644
-                     stat.S_IRUSR | stat.S_IWUSR |
-                     stat.S_IRGRP | stat.S_IROTH )
+            self._fixperms()
+
+    def _fixperms(filename):
+        """
+        Fait un C{chmod 644}. Séparé pour faciliter les tests unitaires.
+        """
+        os.chmod(filename, # chmod 644
+                 stat.S_IRUSR | stat.S_IWUSR |
+                 stat.S_IRGRP | stat.S_IROTH )
+
+    # Proxies
+
+    def start(self):
+        return self.rrdtool.start()
+
+    def stop(self):
+        return self.rrdtool.stop()
+
+    def isStarted(self):
+        return self.rrdtool.started
 
 
 
-class RRDToolManager(object):
+class RRDToolPoolManager(object):
     """
     Gère l'interaction avec RRDTool, c'est à dire avec le pool de process et
     les aspects filesystem.
@@ -153,20 +205,7 @@ class RRDToolManager(object):
         self.pool = RRDToolPool(pool_size, self.rrd_bin, rrdcached=rrdcached)
         if rrdcached and check_thresholds:
             # On créé un petit pool sans RRDcached
-            self.pool_direct = RRDToolPool(1)
-
-
-    def getFilename(self, msgdata):
-        filename = get_rrd_path(msgdata["host"], msgdata["datasource"],
-                                self.rrd_base_dir, self.rrd_path_mode)
-        return filename
-
-    def getOldFilename(self, msgdata):
-        old_filename = os.path.join(
-            self.rrd_base_dir,
-            msgdata["host"].encode('utf-8'),
-            "%s.rrd" % urllib.quote_plus(msgdata["datasource"].encode('utf-8'))
-        )
+            self.pool_direct = RRDToolPool(1, self.rrd_bin)
 
 
     def makedirs(self, directory):
@@ -473,5 +512,3 @@ class RRDToolPool(object):
             #             self.job_count, index+1)
             return rrdtool.run(command, filename, args)
         raise NoAvailableProcess()
-
-
