@@ -18,6 +18,7 @@ import unittest
 from nose.twistedtools import reactor, deferred
 
 from twisted.internet import defer
+from mock import patch
 
 from vigilo.common.conf import settings
 settings.load_module(__name__)
@@ -33,7 +34,8 @@ class ConfDBTest(unittest.TestCase):
     """
 
     @deferred(timeout=5)
-    def setUp(self):
+    @patch('signal.signal') # erreurs de threads
+    def setUp(self, signal):
         self.tmpdir = tempfile.mkdtemp(prefix="test-connector-metro-")
         dbpath_orig = os.path.join(os.path.dirname(__file__),
                                    "connector-metro.db")

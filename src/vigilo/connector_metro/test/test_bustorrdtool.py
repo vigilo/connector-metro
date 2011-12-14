@@ -46,11 +46,9 @@ class BusToRRDtoolTestCase(unittest.TestCase):
 
     @deferred(timeout=30)
     def setUp(self):
-        #client = ClientStub("testhostname", None, None)
-        #confdb = ConfDB(os.path.join(os.path.dirname(__file__),
-        #                             "connector-metro.db"))
         self.btr = BusToRRDtool(Mock(), Mock(), Mock())
-        #self.btr.setClient(client)
+        self.btr.rrdtool.start.return_value = defer.succeed(None)
+        self.btr.rrdtool.stop.return_value = defer.succeed(None)
         return self.btr.startService()
 
     @deferred(timeout=30)
@@ -66,34 +64,18 @@ class BusToRRDtoolTestCase(unittest.TestCase):
                 "host": "server1.example.com",
                 "datasource": "Load",
                 "value": "12",
+                "has_thresholds": True,
                 }
-        self.btr.confdb.has_host.return_value = True
-        self.btr.threshold_checker.hasThreshold.return_value = True
-        d = self.btr.write(msg)
+        self.btr.confdb.has_host.return_value = defer.succeed(True)
+        self.btr.threshold_checker.hasThreshold.return_value = msg
+        self.btr.rrdtool.createIfNeeded.return_value = msg
+        self.btr.rrdtool.processMessage.return_value = msg
+        d = self.btr.processMessage(msg)
         def check(r):
             self.assertTrue(self.btr.rrdtool.createIfNeeded.called)
             self.assertTrue(self.btr.rrdtool.processMessage.called)
             self.assertTrue(self.btr.threshold_checker.hasThreshold.called)
             self.assertTrue(self.btr.threshold_checker.checkMessage.called)
-        d.addCallback(check)
-        return d
-
-
-    @deferred(timeout=30)
-    def test_unhandled_host(self):
-        """Le connecteur doit ignorer les hôtes non-déclarés."""
-        msg = { "type": "perf",
-                "timestamp": "1165939739",
-                "host": "unknown.example.com",
-                "datasource": "Load",
-                "value": "12",
-                }
-        self.btr.confdb.has_host.return_value = False
-        d = self.btr.write(msg)
-        # on vérifie que le fichier correspondant n'a pas été créé
-        def check(r):
-            self.assertFalse(self.btr.rrdtool.createIfNeeded.called)
-            self.assertFalse(self.btr.rrdtool.processMessage.called)
         d.addCallback(check)
         return d
 
@@ -105,11 +87,13 @@ class BusToRRDtoolTestCase(unittest.TestCase):
                "timestamp": "123456789",
                "host": "dummy_host",
                "datasource": "dummy_datasource",
-               "value": "dummy_value",
+               "value": "42",
                }
-        self.btr.confdb.has_host.return_value = False
+        self.btr.confdb.has_host.return_value = defer.succeed(False)
         d = self.btr._parse_message(msg)
         def check_failure(f):
+            self.assertFalse(self.btr.rrdtool.createIfNeeded.called)
+            self.assertFalse(self.btr.rrdtool.processMessage.called)
             if not isinstance(f.value, NotInConfiguration):
                 self.fail("Raised exeception is not of the right type (got %s)"
                           % type(f.value))
@@ -147,10 +131,12 @@ class BusToRRDtoolTestCase(unittest.TestCase):
                 "status": "CRITICAL",
                 "message": "message",
                 }
-        d = self.btr.write(msg)
+        self.btr.confdb.has_host.return_value = defer.succeed(True)
+        d = self.btr.processMessage(msg)
         def cb(r):
-            self.assertEqual(len(self.ntrf.rrdtool.commands), 0)
-            self.assertEqual(self.ntrf._messages_forwarded, -1)
+            self.assertFalse(self.btr.rrdtool.createIfNeeded.called)
+            self.assertFalse(self.btr.rrdtool.run.called)
+            self.assertEqual(self.btr._messages_forwarded, -1)
         d.addCallback(cb)
         return d
 
@@ -182,9 +168,10 @@ class BusToRRDtoolTestCase(unittest.TestCase):
                 # pas de clé datasource
                 "value": "12",
                 }
-        d = self.btr.write(msg)
+        d = self.btr.processMessage(msg)
         def cb(r):
-            self.assertEqual(len(self.ntrf.rrdtool.commands), 0)
+            self.assertFalse(self.btr.rrdtool.createIfNeeded.called)
+            self.assertFalse(self.btr.rrdtool.run.called)
         d.addCallback(cb)
         return d
 
@@ -192,6 +179,7 @@ class BusToRRDtoolTestCase(unittest.TestCase):
     @deferred(timeout=30)
     def test_valid_values(self):
         """Réception d'un message avec une valeur valide"""
+        self.btr.confdb.has_host.return_value = defer.succeed(True)
         msg_tpl = { "type": "perf",
                     "timestamp": "1165939739",
                     "host": "server1.example.com",
@@ -228,15 +216,33 @@ class BusToRRDtoolTestCase(unittest.TestCase):
     @deferred(timeout=30)
     def test_stats(self):
         """Statistiques"""
+        self.btr.confdb.count_datasources.return_value = defer.succeed(4)
         d = self.btr.getStats()
         def cb(r):
             self.assertEqual(r, {
-                'queue': 0,
                 'forwarded': 0,
                 'pds_count': 4,
-                'sent': 0,
                 'illegal_updates': 0,
             })
         d.addCallback(cb)
         return d
+
+
+    @deferred(timeout=30)
+    def test_no_check_thresholds(self):
+        """Désactivation de la vérification des seuils"""
+        msg = { "type": "perf",
+                "timestamp": "1165939739",
+                "host": "Host éçà",
+                "datasource": "PDS éçà",
+                "value": "42",
+                }
+        self.btr.threshold_checker = None
+        d = defer.maybeDeferred(self.btr._check_has_thresholds, msg)
+        def check(new_msg):
+            self.assertTrue("has_thresholds" in new_msg)
+            self.assertFalse(new_msg["has_thresholds"])
+        d.addCallback(check)
+        return d
+
 

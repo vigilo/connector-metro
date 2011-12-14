@@ -13,6 +13,8 @@ import time
 from zope.interface import implements
 from twisted.internet.interfaces import IPushProducer
 
+from vigilo.connector_metro.exceptions import MissingConfigurationData
+
 
 
 class ThresholdChecker(object):
@@ -65,43 +67,25 @@ class ThresholdChecker(object):
             return
         ds = self.confdb.get_datasource(perf["host"], perf["datasource"],
                                         cache=True)
-        ds.addCallback(self._get_last_value, perf)
+
+        def get_last_value(ds, perf):
+            last = self.rrdtool.getLastValue(ds, perf)
+            last.addCallback(self._compare_thresholds, ds)
+            return last
+        def eb(f):
+            f.trap(MissingConfigurationData)
+            return None
+        ds.addCallback(get_last_value, perf)
+        ds.addErrback(eb)
+
         if self._check_thresholds_synchronously:
             return ds
 
 
-    def _get_last_value(self, ds, perf):
-        # simple précaution, redondant avec self.confdb.has_threshold
-        attrs = [
-            'warning_threshold',
-            'critical_threshold',
-            'nagiosname',
-            'jid',
-        ]
-        for attr in attrs:
-            if ds[attr] is None:
-                return
-        # récupération de la dernière valeur enregistrée
-        filename = self.rrdtool.getFilename(perf)
-        last = self.rrdtool.run("fetch", filename,
-                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
-                    no_rrdcached=True)
-        last.addCallback(self._compare_thresholds, ds)
-        return last
-
-
     def _compare_thresholds(self, last, ds):
-        # Modèle pour la commande à envoyer à Nagios.
-        tpl =   u'<%(onetoone)s to="%(recipient)s">' \
-                u'<command xmlns="%(namespace)s">' \
-                    u'<timestamp>%(timestamp)f</timestamp>' \
-                    u'<cmdname>PROCESS_SERVICE_CHECK_RESULT</cmdname>' \
-                    u'<value>%(host)s;%(service)s;%(state)d;%(msg)s</value>' \
-                u'</command>' \
-                u'</%(onetoone)s>'
-
         message = {
-            'type': "command",
+            'type': "nagios",
+            'routing_key': ds['ventilation'],
             'timestamp': self.get_current_time(),
             'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
         }
@@ -109,10 +93,6 @@ class ThresholdChecker(object):
         # La réponse de rrdtool est de la forme " DS\n\ntimestamp: value\n"
         # en cas de succès et "" en cas d'erreur.
         # On s'arrange pour récupérer uniquement la valeur.
-        if not last:
-            return
-
-        last = parse_rrdtool_response(last)
         if last is None:
             return
 
@@ -135,25 +115,9 @@ class ThresholdChecker(object):
             status = (3, 'UNKNOWN: Invalid threshold configuration (%s)' % e)
 
         message["value"] = ";".join((ds['hostname'], ds['nagiosname'],
-                                     status[0], status[1]))
+                                     str(status[0]), status[1]))
 
-        self._messages_sent += 1
         return self.consumer.write(message)
-
-
-
-def parse_rrdtool_response(response):
-    value = None
-    for line in response.split("\n"):
-        if not line.count(": ") == 1:
-            continue
-        timestamp, current_value = line.strip().split(": ")
-        if current_value == "nan":
-            continue
-        value = current_value
-    if value is not None:
-        value = float(value) # python convertit tout seul la notation exposant
-    return value
 
 
 

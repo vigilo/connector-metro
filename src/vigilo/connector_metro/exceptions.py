@@ -19,4 +19,8 @@ class NotInConfiguration(KeyError):
     pass
 
 
+class MissingConfigurationData(KeyError):
+    pass
+
+
 

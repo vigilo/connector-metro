@@ -5,7 +5,7 @@
 # License: GNU GPL v2 <http://www.gnu.org/licenses/gpl-2.0.html>
 
 import unittest
-from vigilo.connector_metro.nodetorrdtool import parse_rrdtool_response
+from vigilo.connector_metro.rrdtool import parse_rrdtool_response
 
 class RRDToolParserTestCase(unittest.TestCase):
     def test_empty(self):

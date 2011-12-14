@@ -69,7 +69,7 @@ def makeService(options):
 
     # Gestion des seuils
     if must_check_th:
-        threshold_checker = ThresholdChecker(rrdtool_pool, confdb)
+        threshold_checker = ThresholdChecker(rrdtool, confdb)
         bus_publisher = buspublisher_factory(settings, client)
         bus_publisher.registerProducer(threshold_checker, streaming=True)
     else:

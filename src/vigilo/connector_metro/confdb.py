@@ -185,7 +185,7 @@ class ConfDB(object):
                       "min", "max",
                       "factor",
                       "warning_threshold", "critical_threshold",
-                      "nagiosname", "jid"]
+                      "nagiosname", "ventilation"]
         if self._db is None:
             return defer.succeed(dict([(p, None) for p in properties]))
         if cache and (hostname, dsname) in self._cache["ds"]:

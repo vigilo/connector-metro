@@ -27,6 +27,7 @@ _ = translate(__name__)
 
 from vigilo.connector_metro.exceptions import CreationError
 from vigilo.connector_metro.exceptions import NotInConfiguration
+from vigilo.connector_metro.exceptions import MissingConfigurationData
 
 
 class NoAvailableProcess(Exception):
@@ -42,6 +43,21 @@ class RRDToolError(Exception):
     def __init__(self, filename, message):
         Exception.__init__(self, message)
         self.filename = filename
+
+
+
+def parse_rrdtool_response(response):
+    value = None
+    for line in response.split("\n"):
+        if not line.count(": ") == 1:
+            continue
+        timestamp, current_value = line.strip().split(": ")
+        if current_value == "nan":
+            continue
+        value = current_value
+    if value is not None:
+        value = float(value) # python convertit tout seul la notation exposant
+    return value
 
 
 
@@ -151,15 +167,34 @@ class RRDToolManager(object):
                            'msg': e })
             raise CreationError()
         else:
-            self._fixperms()
+            self._fixperms(filename)
 
-    def _fixperms(filename):
+    def _fixperms(self, filename):
         """
         Fait un C{chmod 644}. Séparé pour faciliter les tests unitaires.
         """
         os.chmod(filename, # chmod 644
                  stat.S_IRUSR | stat.S_IWUSR |
                  stat.S_IRGRP | stat.S_IROTH )
+
+
+    def getLastValue(self, ds, msg):
+        attrs = [
+            'warning_threshold',
+            'critical_threshold',
+            'nagiosname',
+            'ventilation',
+        ]
+        for attr in attrs:
+            if ds[attr] is None:
+                return defer.fail(MissingConfigurationData(attr))
+        # récupération de la dernière valeur enregistrée
+        filename = self.getFilename(msg)
+        d = self.rrdtool.run("fetch", filename,
+                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
+                    no_rrdcached=True)
+        d.addCallback(parse_rrdtool_response)
+        return d
 
     # Proxies
 

@@ -85,62 +85,47 @@ class BusToRRDtool(MessageHandler):
         @type msg: C{twisted.words.test.domish Xml}
         """
         d = self._parse_message(msg)
-        d.addCallbacks(self.rrdtool.createIfNeeded, self._eb)
+        d.addCallback(self.rrdtool.createIfNeeded)
         d.addCallback(self._check_has_thresholds)
-        d.addCallbacks(self.rrdtool.processMessage, self._eb)
-        d.addErrback(self._eb_rrdtool)
+        d.addCallback(self.rrdtool.processMessage)
         d.addCallback(self._check_thresholds)
+        d.addErrback(self._eb)
         return d
 
 
     def _parse_message(self, msg):
-        if msg.name != 'perf':
+        if msg["type"] != 'perf':
             errormsg = _("'%(msgtype)s' is not a valid message type for "
                          "metrology")
             return defer.fail(WrongMessageType((
-                    errormsg % {'msgtype' : msg.name}
+                    errormsg % {'msgtype' : msg["type"]}
                 ).encode('utf-8')))
-        perf = {}
-        for c in msg.children:
-            perf[str(c.name)] = unicode(c.children[0])
 
         for i in 'timestamp', 'value', 'host', 'datasource':
-            if i not in perf:
+            if i not in msg:
                 errormsg = _(u"Not a valid performance message (missing "
                               "'%(tag)s' tag)")
                 return defer.fail(InvalidMessage((
                         errormsg % {"tag": i}
                     ).encode('utf-8')))
 
-        if perf["value"] != u"U":
+        if msg["value"] != u"U":
             try:
-                float(perf["value"])
+                float(msg["value"])
             except ValueError:
                 return defer.fail(InvalidMessage((
-                        _("Invalid metrology value: %s") % perf["value"]
+                        _("Invalid metrology value: %s") % msg["value"]
                     ).encode('utf-8')))
 
-        d = self.confdb.has_host(perf["host"])
-        def cb(isinconf, perf):
+        d = self.confdb.has_host(msg["host"])
+        def cb(isinconf, msg):
             if not isinconf:
                 return defer.fail(NotInConfiguration((
-                        _("Skipping perf update for host %s") % perf["host"]
+                        _("Skipping perf update for host %s") % msg["host"]
                     ).encode('utf-8')))
-            return perf
-        d.addCallback(cb, perf)
+            return msg
+        d.addCallback(cb, msg)
         return d
-
-
-    def _eb(self, f):
-        err_class = f.trap(InvalidMessage, WrongMessageType,
-                           NotInConfiguration, CreationError)
-        if err_class == InvalidMessage:
-            LOGGER.error(str(f.value))
-        elif (err_class == NotInConfiguration or
-              err_class == WrongMessageType):
-            self._messages_forwarded -= 1
-            #LOGGER.debug(str(f.value))
-        return None
 
 
     def _check_has_thresholds(self, perf):
@@ -153,22 +138,6 @@ class BusToRRDtool(MessageHandler):
         return self.threshold_checker.hasThreshold(perf)
 
 
-    def _eb_rrdtool(self, f):
-        f.trap(RRDToolError)
-        error_msg = f.getErrorMessage()
-
-        # Le message de rrdtool ne dépend pas de la locale,
-        # donc on peut faire ce test sans crainte.
-        if error_msg.endswith('(minimum one second step)'):
-            self._illegal_updates += 1
-            return
-
-        LOGGER.error(_("RRDtool could not update the file %(filename)s. "
-                       "Message: %(msg)s"), {
-                     'filename': f.value.filename,
-                     'msg': error_msg })
-
-
     def _check_thresholds(self, perf, sync=False):
         if perf is None:
             return None
@@ -176,6 +145,30 @@ class BusToRRDtool(MessageHandler):
                 not perf["has_thresholds"]):
             return perf
         return self.threshold_checker.checkMessage(perf)
+
+
+    def _eb(self, f):
+        err_class = f.trap(InvalidMessage, WrongMessageType,
+                           NotInConfiguration, CreationError, RRDToolError)
+        error_msg = f.getErrorMessage()
+        if err_class == InvalidMessage:
+            LOGGER.error(error_msg)
+        elif (err_class == NotInConfiguration or
+              err_class == WrongMessageType):
+            self._messages_forwarded -= 1
+            #LOGGER.debug(str(f.value))
+        elif err_class == RRDToolError:
+            # Le message de rrdtool ne dépend pas de la locale,
+            # donc on peut faire ce test sans crainte.
+            if error_msg.endswith('(minimum one second step)'):
+                self._illegal_updates += 1
+            else:
+                LOGGER.error(_("RRDtool could not update the file "
+                        "%(filename)s. Message: %(msg)s"), {
+                             'filename': f.value.filename,
+                             'msg': error_msg })
+        # on ne renvoie pas le message en file (erreurs permanentes)
+        return None
 
 
     @defer.inlineCallbacks
