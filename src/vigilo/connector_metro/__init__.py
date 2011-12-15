@@ -25,7 +25,6 @@ def makeService(options):
 
     from vigilo.connector.client import client_factory
     from vigilo.connector.handlers import buspublisher_factory
-    from vigilo.connector.status import statuspublisher_factory
 
     from vigilo.connector_metro.rrdtool import RRDToolPoolManager
     from vigilo.connector_metro.rrdtool import RRDToolManager
@@ -81,6 +80,7 @@ def makeService(options):
     bustorrdtool.subscribe(settings["bus"]["queue"])
 
     # Statistiques
+    from vigilo.connector.status import statuspublisher_factory
     servicename = options["name"]
     if servicename is None:
         servicename = "vigilo-connector-metro"

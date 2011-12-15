@@ -59,7 +59,6 @@ class BusToRRDtool(MessageHandler):
         c'est-à-dire lorsque la connexion a réussi et que les échanges
         initiaux (handshakes) sont terminés.
         """
-        self.rrdtool.start()
         # On réinitialise le compteur à chaque connexion établie avec succès.
         self._illegal_updates = 0
 
