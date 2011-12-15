@@ -20,10 +20,6 @@ from nose.twistedtools import reactor, deferred
 from twisted.internet import defer
 from mock import patch
 
-from vigilo.common.conf import settings
-settings.load_module(__name__)
-from vigilo.connector.test.helpers import wait
-
 from vigilo.connector_metro.confdb import ConfDB, NoConfDBError
 
 

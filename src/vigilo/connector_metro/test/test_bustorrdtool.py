@@ -6,10 +6,6 @@
 
 from __future__ import absolute_import
 
-import tempfile
-import os
-import stat
-from shutil import rmtree
 import unittest
 
 # ATTENTION: ne pas utiliser twisted.trial, car nose va ignorer les erreurs
@@ -19,21 +15,12 @@ from nose.twistedtools import reactor, deferred
 
 from mock import Mock
 
-#from twisted.words.protocols.jabber.jid import JID
 from twisted.internet import defer
-from twisted.python.failure import Failure
-from vigilo.connector.test.helpers import ClientStub
 
-from vigilo.common.conf import settings
-settings.load_module(__name__)
 from vigilo.connector_metro.bustorrdtool import BusToRRDtool
-from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.exceptions import NotInConfiguration
 from vigilo.connector_metro.exceptions import WrongMessageType
 from vigilo.connector_metro.exceptions import InvalidMessage
-from vigilo.connector_metro.confdb import ConfDB
-
-from .helpers import RRDToolPoolManagerStub
 
 
 

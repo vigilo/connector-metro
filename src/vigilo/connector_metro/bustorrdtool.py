@@ -9,10 +9,7 @@ depuis un bus pour les stocker dans une base de données RRDtool.
 
 from __future__ import absolute_import
 
-import os
-import stat
 import time
-import urllib
 
 from twisted.internet import defer
 

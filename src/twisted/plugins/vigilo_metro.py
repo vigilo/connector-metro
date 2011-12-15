@@ -11,7 +11,6 @@ from twisted.application import service
 
 
 from vigilo.common.gettext import translate
-from vigilo.connector import client
 from vigilo.connector import options as base_options
 
 _ = translate('vigilo.connector_metro')

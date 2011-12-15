@@ -12,6 +12,7 @@ Gestion d'un process RRDTool pour écrire ou lire des RRDs.
 import os
 import stat
 import urllib
+from signal import SIGINT, SIGTERM
 
 from twisted.internet import reactor, protocol, defer
 from twisted.internet.error import ProcessDone, ProcessTerminated
@@ -472,11 +473,13 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
     def processEnded(self, reason):
         if isinstance(reason.value, ProcessDone):
             LOGGER.info(_('The RRDTool process exited normally'))
-        elif isinstance(reason.value, ProcessTerminated):
-            LOGGER.warning(_('The RRDTool process was terminated abnormally '
-                             'with exit code %(rcode)s and message: %(msg)s'),
-                           {"rcode": reason.value.exitCode, # peut être None
-                            "msg": reason.getErrorMessage()})
+        elif (isinstance(reason.value, ProcessTerminated)
+                and reason.value.signal not in (SIGINT, SIGTERM)):
+            LOGGER.warning(_('The RRDTool process was terminated '
+                    'abnormally with exit code %(rcode)s and message: '
+                    '%(msg)s'),
+                    {"rcode": reason.value.exitCode, # peut être None
+                     "msg": reason.getErrorMessage()})
         if not self._keep_alive:
             if self.deferred_stop is not None:
                 self.deferred_stop.callback(None)

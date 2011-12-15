@@ -17,23 +17,14 @@ import unittest
 #from twisted.trial import unittest
 from nose.twistedtools import reactor, deferred
 
-from mock import Mock, patch
+from mock import patch
 
-#from twisted.words.protocols.jabber.jid import JID
-from twisted.internet import defer
-from twisted.python.failure import Failure
-from vigilo.connector.test.helpers import ClientStub
-
-from vigilo.common.conf import settings
-settings.load_module(__name__)
 from vigilo.connector_metro.bustorrdtool import BusToRRDtool
-from vigilo.connector_metro.bustorrdtool import WrongMessageType
-from vigilo.connector_metro.bustorrdtool import InvalidMessage
 from vigilo.connector_metro.rrdtool import RRDToolManager
-from vigilo.connector_metro.rrdtool import NotInConfiguration
 from vigilo.connector_metro.threshold import ThresholdChecker
 from vigilo.connector_metro.confdb import ConfDB
 
+from vigilo.connector.test.helpers import ClientStub
 from .helpers import RRDToolPoolManagerStub
 
 
