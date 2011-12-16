@@ -14,8 +14,8 @@ from twisted.application import service
 
 def makeService(options):
     """ the service that wraps everything the connector needs. """
-    from vigilo.connector import getSettings
-    settings = getSettings(options)
+    from vigilo.connector.options import getSettings
+    settings = getSettings(options, __name__)
 
     from vigilo.common.logging import get_logger
     LOGGER = get_logger(__name__)
