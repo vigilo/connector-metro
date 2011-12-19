@@ -63,11 +63,6 @@ class BusToRRDtool(MessageHandler):
         self._illegal_updates = 0
 
 
-    def isConnected(self):
-        """Sauf cas exceptionnel, on est toujours connecté"""
-        return self.rrdtool.isStarted()
-
-
     def processMessage(self, msg):
         """
         Transmet un message reçu du bus à RRDtool.
