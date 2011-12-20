@@ -31,7 +31,7 @@ from vigilo.connector_metro.exceptions import NotInConfiguration
 
 class BusToRRDtool(MessageHandler):
     """
-    Reçoit des données de métrologie (performances) depuis le bus XMPP
+    Reçoit des données de métrologie (performances) depuis le bus
     et les transmet à RRDtool pour générer des base de données RRD.
     """
     get_current_time = time.time
