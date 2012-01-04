@@ -13,7 +13,7 @@ from twisted.application import service
 
 def makeService(options):
     """ the service that wraps everything the connector needs. """
-    from vigilo.connector.options import getSettings
+    from vigilo.connector.options import getSettings, parseSubscriptions
     settings = getSettings(options, __name__)
 
     from vigilo.common.logging import get_logger
@@ -76,7 +76,8 @@ def makeService(options):
     # Gestionnaire principal des messages
     bustorrdtool = BusToRRDtool(confdb, rrdtool, threshold_checker)
     bustorrdtool.setClient(client)
-    bustorrdtool.subscribe(settings["bus"]["queue"])
+    subs = parseSubscriptions(settings)
+    bustorrdtool.subscribe(settings["bus"]["queue"], subs)
 
     # Statistiques
     from vigilo.connector.status import statuspublisher_factory
