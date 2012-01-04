@@ -1,3 +1,27 @@
+[bus]
+# Nom ou adresse IP du serveur AMQP à utiliser.
+host = localhost
+
+# Nom d'utilisateur à utiliser pour se connecter au bus.
+user = connector-metro
+
+# Mot de passe à utiliser
+password = connector-metro
+
+# Chiffrement du flux par SSL
+use_ssl = False
+
+# Nom de la file d'attente du connecteur
+queue = connector-metro-localhost
+
+# Liste des abonnements du connecteur, séparés par des virgules.
+# Si la liste est vide, mettre uniquement une virgule.
+subscriptions = perf
+
+# Le trafic lié au bus doit-il être enregistré dans les logs ?
+log_traffic = False
+
+
 [connector-metro]
 # Fichier de config distribué par VigiConf
 config = @SYSCONFDIR@/vigilo/vigiconf/prod/connector-metro.db
@@ -34,77 +58,28 @@ rrd_bin = /usr/bin/rrdtool
 #check_thresholds = True
 
 
-[bus]
-# Nom ou adresse IP du serveur XMPP à utiliser.
-host = localhost
-
-# Nom du service de publication pour les messages.
-service = pubsub.localhost
-
-# Nom d'utilisateur à utiliser pour se connecter au bus.
-jid = connector-metro@localhost
-
-# Mot de passe associé au JID donné.
-password = connector-metro
-
-# Priorité statique. Si cette valeur n'est pas renseignée, la priorité est
-# automatiquement choisie en fonction du nombre de connecteurs utilisant le
-# même compte sur le bus.
-#priority = 1
-
-# Si require_* à True, le chiffrement de la connexion sera privilégié.
-# Indique s'il faut chiffrer la connexion (True).
-require_tls = False
-
-# Indique s'il faut compresser le flux (True)
-require_compression = False
-
-# Liste des noms des topics auxquels le connecteur est abonné,
-# séparés par des virgules.
-# Si la liste est vide, mettre uniquement une virgule.
-subscriptions = /vigilo/perf
-
-# Le trafic lié au bus XMPP doit-il être enregistré dans les logs ?
-log_traffic = False
-
-
 [connector]
-# Emplacement du fichier de sauvegarde local en cas de pannes.
-backup_file = @LOCALSTATEDIR@/lib/vigilo/connector-metro/backup.sqlite
-
-# Nom de la table qui stocke les messages en attente à destination du bus.
-backup_table_to_bus = tobus
-
-# Nom de la table qui stocke les messages en attente en provenance du bus.
-backup_table_from_bus = frombus
-
 # Nom d'hôte utilisé pour signaler à Vigilo que ce connecteur fonctionne
 # correctement. Cela doit correspondre au nom d'hôte configuré dans VigiConf
 # pour cette machine. Par défaut, on utilise le nom d'hôte court (sans le
 # domaine DNS)
 #hostname = hostname
 
-# Le noeud de publication à utiliser pour les messages d'état du connecteur.
-# Par défaut, les noeuds définis dans la section [publications] sont utilisés.
-#status_node = /vigilo/connectors-status
-
-# La taille maximum de la file d'attente mémoire, à partir de laquelle le
-# connecteur indique au bus de ne plus lui envoyer de messages.
-# Une limite à 50000 correspond à environ 1Go de RAM utilisé.
-# La valeur par défaut est 0, ce qui désactive cette vérification.
-#max_queue_size = 0
+# L'exchange à utiliser pour les messages d'état du connecteur.
+# Par défaut, la section [publications] est utilisée.
+#status_exchange = connectors-status
 
 
 [publications]
-# Noms des messages XML traités avec pour chaque type de message
-# le nom du nœud XMPP sur lesquel les messages de ce type sont envoyés.
-perf = /vigilo/perf
-state = /vigilo/state
-event = /vigilo/event
-command = /vigilo/command
-# Dans le connector-metro, la publication est utilisée pour diffuser les
-# métriques de fonctionnement
+# Types de messages et le nom de l'exchange à utiliser pour leur publication.
+# Par défaut, un exchange du même nom que le type est utilisé.
+#perf = perf
+#nagios = nagios
 
+
+# -------
+# Logging
+#
 
 [loggers]
 keys = root,twisted
