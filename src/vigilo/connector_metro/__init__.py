@@ -81,10 +81,7 @@ def makeService(options):
 
     # Statistiques
     from vigilo.connector.status import statuspublisher_factory
-    servicename = options["name"]
-    if servicename is None:
-        servicename = "vigilo-connector-metro"
-    status_publisher = statuspublisher_factory(settings, servicename, client,
+    status_publisher = statuspublisher_factory(settings, client,
             providers=(bustorrdtool,))
 
     return root_service

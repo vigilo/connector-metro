@@ -65,6 +65,11 @@ rrd_bin = /usr/bin/rrdtool
 # domaine DNS)
 #hostname = hostname
 
+# Service utilisé pour signaler à Vigilo que ce connecteur fonctionne
+# correctement. Comme ci-dessus, cela doit correspondre au nom de service
+# configuré dans VigiConf.
+#status_service = vigilo-connector-metro
+
 # L'exchange à utiliser pour les messages d'état du connecteur.
 # Par défaut, la section [publications] est utilisée.
 #status_exchange = connectors-status
