@@ -2,109 +2,29 @@
 # Copyright (C) 2006-2011 CS-SI
 # License: GNU GPL v2 <http://www.gnu.org/licenses/gpl-2.0.html>
 
-""" Chargement du fichier de configuration généré par Vigiconf. """
+"""
+Chargement d'une base sqlite de configuration générée par Vigiconf pour le
+connector-metro.
+"""
 
 from __future__ import absolute_import
 
-import os
-import signal
+from twisted.internet import defer
 
-from twisted.internet import defer, task
-from twisted.enterprise import adbapi
-
-from vigilo.common.logging import get_logger
-LOGGER = get_logger(__name__)
-from vigilo.common.gettext import translate
-_ = translate(__name__)
+from vigilo.connector.confdb import ConfDB
 
 
 
-class NoConfDBError(Exception):
-    pass
-
-
-
-class ConfDB(object):
+class MetroConfDB(ConfDB):
     """
-    Accès à la configuration fournie par VigiConf (dans une base SQLite)
-    @ivar _db: Instance de connexion ADBAPI, voir
-        U{http://twistedmatrix.com/documents/10.1.0/core/howto/rdbms.html}.
-    @type _db: C{twisted.enterprise.adbapi.ConnectionPool}
+    Accès à la configuration du connector-metro fournie par VigiConf (dans une
+        base SQLite)
     """
 
 
     def __init__(self, path):
-        self.path = path
-        self._db = None
-        self._timestamp = 0
-        self._reload_task = task.LoopingCall(self.reload)
+        super(MetroConfDB, self).__init__(path)
         self._cache = {"hosts": None, "has_threshold": None, "ds": {}}
-
-        # Sauvegarde du handler courant pour SIGHUP
-        # et ajout de notre propre handler pour recharger
-        # le connecteur (lors d'un service ... reload).
-        self._prev_sighup_handler = signal.getsignal(signal.SIGHUP)
-        signal.signal(signal.SIGHUP, self._sighup_handler)
-
-
-    def start(self):
-        if not self._reload_task.running:
-            self._reload_task.start(10) # toutes les 10s
-
-
-    def stop(self):
-        if self._reload_task.running:
-            self._reload_task.stop()
-        if self._db is not None:
-            self._db.close()
-
-
-    def start_db(self):
-        if not os.path.exists(self.path):
-            LOGGER.warning(_("No configuration database yet!"))
-            raise NoConfDBError()
-        self._timestamp = os.stat(self.path).st_mtime
-        # threads: http://twistedmatrix.com/trac/ticket/3629
-        self._db = adbapi.ConnectionPool("sqlite3", self.path,
-                                         check_same_thread=False)
-        LOGGER.debug("Connected to the configuration database")
-        self._rebuild_cache()
-
-
-    def _sighup_handler(self, signum, frames):
-        """
-        Gestionnaire du signal SIGHUP: recharge la conf.
-
-        @param signum: Signal qui a déclenché le rechargement (= SIGHUP).
-        @type signum: C{int} ou C{None}
-        @param frames: Frames d'exécution interrompues par le signal.
-        @type frames: C{list}
-        """
-        LOGGER.info(_("Received signal to reload the configuration"))
-        self.reload()
-        # On appelle le précédent handler s'il y en a un.
-        # Eventuellement, il s'agira de signal.SIG_DFL ou signal.SIG_IGN.
-        if callable(self._prev_sighup_handler):
-            self._prev_sighup_handler(signum, frames)
-
-
-    def reload(self):
-        """
-        Provoque une reconnexion à la base si elle a changé
-        """
-        if self._db is None:
-            try:
-                self.start_db()
-            except NoConfDBError:
-                return
-        current_timestamp = os.stat(self.path).st_mtime
-        if current_timestamp <= self._timestamp:
-            return # ça n'a pas changé
-        LOGGER.debug("Reconnecting to the configuration database")
-        self._db.close()
-        self._db.start()
-        self._timestamp = current_timestamp
-        self._rebuild_cache()
 
 
     def _rebuild_cache(self):
