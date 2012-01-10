@@ -87,6 +87,7 @@ class ThresholdChecker(object):
             'type': "nagios",
             'routing_key': ds['ventilation'],
             'timestamp': self.get_current_time(),
+            'host': ds['hostname'],
             'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
         }
 

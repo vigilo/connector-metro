@@ -101,6 +101,7 @@ class ThresholdCheckerTestCase(unittest.TestCase):
             'type': "nagios",
             'routing_key': "ventilation_group",
             'timestamp': 42,
+            'host': "server1.example.com",
             'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
         }
         msg_value_tpl = "server1.example.com;MetroLoad;%(state)d;%(msg)s"
@@ -160,6 +161,7 @@ class ThresholdCheckerTestCase(unittest.TestCase):
             'type': "nagios",
             'routing_key': "ventilation_group",
             'timestamp': 42,
+            'host': u"Host éçà",
             'cmdname': "PROCESS_SERVICE_CHECK_RESULT",
         }
         msg_value_tpl = u"Host éçà;Nagios' éçà;%(state)d;%(msg)s"
