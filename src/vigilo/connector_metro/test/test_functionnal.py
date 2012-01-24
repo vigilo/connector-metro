@@ -22,7 +22,7 @@ from mock import patch
 from vigilo.connector_metro.bustorrdtool import BusToRRDtool
 from vigilo.connector_metro.rrdtool import RRDToolManager
 from vigilo.connector_metro.threshold import ThresholdChecker
-from vigilo.connector_metro.confdb import ConfDB
+from vigilo.connector_metro.confdb import MetroConfDB
 
 from vigilo.connector.test.helpers import ClientStub
 from .helpers import RRDToolPoolManagerStub
@@ -43,15 +43,17 @@ class FunctionalTestCase(unittest.TestCase):
         client = ClientStub("testhostname", None, None)
         rrd_base_dir = os.path.join(self.tmpdir, "rrds")
         os.mkdir(rrd_base_dir)
-        confdb = ConfDB(os.path.join(os.path.dirname(__file__),
-                                     "connector-metro.db"))
+        confdb = MetroConfDB(os.path.join(os.path.dirname(__file__),
+                                          "connector-metro.db"))
         self.rrdtool_pool = RRDToolPoolManagerStub(rrd_base_dir,
                     "flat", "/usr/bin/rrdtool")
         rrdtool = RRDToolManager(self.rrdtool_pool, confdb)
         threshold_checker = ThresholdChecker(rrdtool, confdb)
         self.btr = BusToRRDtool(confdb, rrdtool, threshold_checker)
         self.btr.setClient(client)
-        return self.btr.startService()
+        d = self.btr.startService()
+        d.addCallback(lambda _x: confdb.reload())
+        return d
 
     @deferred(timeout=30)
     def tearDown(self):
@@ -62,7 +64,7 @@ class FunctionalTestCase(unittest.TestCase):
 
     @deferred(timeout=30)
     def test_handled_host(self):
-        """Prise en compte de messages sur des hôtes déclarés."""
+        """Functionnal: messages sur des hôtes déclarés."""
 
         rrdfile = os.path.join(self.tmpdir, "rrds",
                                "server1.example.com", "Load.rrd")
@@ -78,6 +80,8 @@ class FunctionalTestCase(unittest.TestCase):
         d = self.btr.processMessage(msg)
         # on vérifie que le fichier correspondant a bien été créé
         def check_created(r):
+            self.assertTrue(os.path.exists(rrdfile),
+                            "Le fichier n'a pas été créé")
             self.assertTrue(stat.S_ISREG(os.stat(rrdfile).st_mode))
         def check_creation_command(r):
             self.assertTrue(len(self.rrdtool_pool.commands) > 0)

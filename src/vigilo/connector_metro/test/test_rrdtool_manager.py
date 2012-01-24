@@ -26,7 +26,7 @@ from mock import Mock
 from twisted.internet import defer
 
 from vigilo.connector_metro.rrdtool import RRDToolManager
-from vigilo.connector_metro.confdb import ConfDB
+from vigilo.connector_metro.confdb import MetroConfDB
 from vigilo.connector_metro.exceptions import NotInConfiguration
 from vigilo.connector_metro.exceptions import MissingConfigurationData
 
@@ -40,9 +40,9 @@ class RRDToolManagerTestCase(unittest.TestCase):
         self.rrd_base_dir = os.path.join(self.tmpdir, "rrds")
         os.mkdir(self.rrd_base_dir)
 
-        confdb = ConfDB(os.path.join(os.path.dirname(__file__),
+        confdb = MetroConfDB(os.path.join(os.path.dirname(__file__),
                                      "connector-metro.db"))
-        confdb.start_db()
+        confdb.reload()
         rrdtool = Mock()
         rrdtool.run.side_effect = lambda *a, **kw: defer.succeed(None)
         rrdtool.rrd_base_dir = self.rrd_base_dir

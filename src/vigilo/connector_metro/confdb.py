@@ -11,7 +11,7 @@ from __future__ import absolute_import
 
 from twisted.internet import defer
 
-from vigilo.connector.confdb import ConfDB
+from vigilo.connector.conffile import ConfDB
 
 
 

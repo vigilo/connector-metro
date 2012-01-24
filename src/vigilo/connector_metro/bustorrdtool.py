@@ -173,9 +173,7 @@ class BusToRRDtool(MessageHandler):
 
 
     def startService(self):
-        self.confdb.start()
         return self.rrdtool.start()
 
     def stopService(self):
-        self.confdb.stop()
         return self.rrdtool.stop()
