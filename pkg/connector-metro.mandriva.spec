@@ -16,22 +16,9 @@ BuildRequires:   python-babel
 
 Requires:   python >= 2.5
 Requires:   python-setuptools
-Requires:   vigilo-common vigilo-connector
+Requires:   vigilo-connector
 Requires:   rrdtool
 Requires:   sqlite3-tools
-######### Dependance from python dependance tree ########
-Requires:   vigilo-pubsub
-Requires:   vigilo-connector
-Requires:   vigilo-common
-Requires:   python-twisted
-Requires:   python-wokkel
-Requires:   python-configobj
-Requires:   python-babel
-Requires:   python-zope-interface
-Requires:   python-setuptools
-Requires:   python-twisted
-Requires:   python-wokkel
-Requires:   python-lxml
 
 Requires(pre): rpm-helper
 
