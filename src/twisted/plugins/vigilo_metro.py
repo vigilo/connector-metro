@@ -23,7 +23,7 @@ class MetroConnectorServiceMaker(object):
     implements(service.IServiceMaker, IPlugin)
     tapname = "vigilo-metro"
     description = "Vigilo connector for performance data"
-    options = base_options.Options
+    options = base_options.make_options('vigilo.connector_metro')
 
     def makeService(self, options):
         """ the service that wraps everything the connector needs. """
