@@ -378,8 +378,8 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
             return defer.succeed(self.transport.pid)
         LOGGER.debug("Starting rrdtool process in server mode")
         self.deferred_start = defer.Deferred()
-        reactor.spawnProcess(self, self.rrd_bin, [self.rrd_bin, "-"],
-                             env=self.env)
+        reactor.callWhenRunning(reactor.spawnProcess, self, self.rrd_bin,
+                                [self.rrd_bin, "-"], env=self.env)
         return self.deferred_start
 
 
