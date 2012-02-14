@@ -141,8 +141,8 @@ class RRDToolManager(object):
         ds_name = msgdata["datasource"]
         ds_list = yield self.confdb.get_host_datasources(host)
         if ds_name not in ds_list:
-            LOGGER.error(_("Host '%(host)s' with datasource '%(ds)s' not found "
-                            "in the configuration !"), {
+            LOGGER.warning(_("Host '%(host)s' with datasource '%(ds)s' not found "
+                             "in the configuration"), {
                                 'host': host,
                                 'ds': ds_name,
                         })
