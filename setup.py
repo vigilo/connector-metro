@@ -38,8 +38,8 @@ setup(name='vigilo-connector-metro',
         url='http://www.projet-vigilo.org/',
         description="Vigilo Metrology connector",
         license='http://www.gnu.org/licenses/gpl-2.0.html',
-        long_description="Gateway from the Vigilo message bus (XMPP) "
-                         "to RRD files.",
+        long_description="Store performance data from the Vigilo "
+                         "message bus in RRD files.",
         zip_safe=False, # pour pouvoir écrire le dropin.cache de twisted
         install_requires=[
             'setuptools',

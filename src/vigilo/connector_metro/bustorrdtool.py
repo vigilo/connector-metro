@@ -39,7 +39,7 @@ class BusToRRDtool(MessageHandler):
 
     def __init__(self, confdb, rrdtool, threshold_checker):
         """
-        Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
+        Instancie un connecteur du bus vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
 
         @param confdb_path: le chemin du fichier SQLite contenant la

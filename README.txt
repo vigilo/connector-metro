@@ -2,8 +2,7 @@ Connector Metro
 ===============
 
 Connector Metro est le composant de Vigilo_ qui réceptionne les messages de
-performance transitant sur le bus XMPP pour les stocker dans des fichiers
-RRDtool.
+performance transitant sur le bus pour les stocker dans des fichiers RRDtool.
 
 Pour les détails du fonctionnement du Connector Metro, se reporter à la
 `documentation officielle`_.

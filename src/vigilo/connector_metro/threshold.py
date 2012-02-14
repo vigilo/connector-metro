@@ -19,7 +19,7 @@ from vigilo.connector_metro.exceptions import MissingConfigurationData
 
 class ThresholdChecker(object):
     """
-    Reçoit des données de métrologie (performances) depuis le bus XMPP
+    Reçoit des données de métrologie (performances) depuis le bus
     et les transmet à RRDtool pour générer des base de données RRD.
     """
 
@@ -29,7 +29,7 @@ class ThresholdChecker(object):
 
     def __init__(self, rrdtool, confdb):
         """
-        Instancie un connecteur BUS XMPP vers RRDtool pour le stockage des
+        Instancie un connecteur du bus vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
 
         @param confdb_path: le chemin du fichier SQLite contenant la
