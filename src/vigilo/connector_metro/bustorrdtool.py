@@ -100,6 +100,8 @@ class BusToRRDtool(MessageHandler):
                         errormsg % {"tag": i}
                     ).encode('utf-8')))
 
+        if msg["value"] == "":
+            msg["value"] = u"U"
         if msg["value"] != u"U":
             try:
                 float(msg["value"])
