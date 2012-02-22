@@ -12,55 +12,14 @@ Afin de pouvoir faire fonctionner le connecteur de métrologie, l'installation
 préalable des logiciels suivants est requise :
 
 * python (>= 2.5), sur la machine où le connecteur est installé
-* rrdtool (>= 1.3), sur la machine où le connecteur est installé
 * ejabberd (>= 2.1), éventuellement sur une machine distante
-
-Reportez-vous aux manuels de ces différents logiciels pour savoir comment
-procéder à leur installation sur votre machine.
-
-Le connecteur de métrologie requiert également la présence de plusieurs
-dépendances Python. Ces dépendances seront automatiquement installées en même
-temps que le paquet du connecteur.
-
-Installation du paquet RPM
---------------------------
-L'installation du connecteur se fait en installant simplement le paquet RPM
-« vigilo-connector-metro ». La procédure exacte d'installation dépend du
-gestionnaire de paquets utilisé. Les instructions suivantes décrivent la
-procédure pour les gestionnaires de paquets RPM les plus fréquemment
-rencontrés.
-
-Installation à l'aide de urpmi::
-
-    urpmi vigilo-connector-metro
-
-Installation à l'aide de yum::
-
-    yum install vigilo-connector-metro
-
-Création du compte XMPP
------------------------
-Le connector-metro nécessite qu'un compte soit créé sur la machine hébergeant
-le bus XMPP pour le composant.
-
-Les comptes doivent être créés sur la machine qui héberge le serveur ejabberd,
-à l'aide de la commande::
-
-    $ su -c 'ejabberdctl register connector-metro localhost connector-metro' ejabberd
-
-**Note :** si plusieurs instances du connecteur s'exécutent simultanément sur
-le parc, chaque instance doit disposer de son propre compte (JID). Dans le cas
-contraire, des conflits risquent de survenir qui peuvent perturber le bon
-fonctionnement de la solution.
+* rrdtool (>= 1.3), sur la machine où le connecteur est installé
 
 
+.. Installation du RPM
+.. include:: ../buildenv/doc/package.rst
 
-Configuration
-=============
-
-Le module connector-metro est fourni avec un fichier de configuration situé
-par défaut dans ``/etc/vigilo/connector-metro/settings.ini``.
-
+.. Compte sur le bus et fichier de configuration
 .. include:: ../../connector/doc/admin-conf-1.rst
 
 .. Lister ici les sections spécifiques au connecteur
@@ -105,40 +64,8 @@ Une valeur adéquate est « /usr/bin/rrdtool » car il s'agit de l'emplacement
 défaut de cet outil sur la plupart des distributions Linux.
 
 
-Administration du service
-=========================
-
-Le connecteur est fourni avec un script de démarrage standard pour Linux,
-facilitant les opérations d'administration du connecteur. Ce chapitre décrit
-les différentes opérations d'administration disponibles.
-
-Démarrage
----------
-Pour démarrer le module connector-metro en mode démon, lancez la commande
-suivante en tant que super-utilisateur::
-
-    service vigilo-connector-metro start
-
-Si le service parvient à démarrer correctement, le message « OK » apparaît dans
-le terminal.
-
-Vérification de l'état du service
----------------------------------
-L'état du service peut être vérifié à tout moment, grâce à la commande::
-
-    service vigilo-connector-metro status
-
-S'il est bien en cours d'exécution, le module connector-metro est maintenant
-apte à traiter les messages issus du bus XMPP. Dans le cas contraire, analysez
-les logs système consignés dans ``/var/log/syslog``.
-
-Arrêt
------
-Pour arrêter le module connector-metro en mode démon, lancez la commande
-suivante en tant que super-utilisateur::
-
-    service vigilo-connector-metro stop
-
+.. Administration du service
+.. include:: ../buildenv/doc/service.rst
 
 
 Annexes
