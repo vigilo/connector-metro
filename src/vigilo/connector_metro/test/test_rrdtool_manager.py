@@ -51,6 +51,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
         self.mgr._fixperms = Mock()
 
     def tearDown(self):
+        self.mgr.confdb._db.close()
         rmtree(self.tmpdir)
 
 
