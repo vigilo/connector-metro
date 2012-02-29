@@ -83,6 +83,6 @@ def makeService(options):
     # Statistiques
     from vigilo.connector.status import statuspublisher_factory
     status_publisher = statuspublisher_factory(settings, client,
-            providers=(bustorrdtool,))
+            providers=(bustorrdtool, bus_publisher))
 
     return root_service
