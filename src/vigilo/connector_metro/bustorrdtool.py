@@ -42,9 +42,9 @@ class BusToRRDtool(MessageHandler):
         Instancie un connecteur du bus vers RRDtool pour le stockage des
         données de performance dans les fichiers RRD.
 
-        @param confdb_path: le chemin du fichier SQLite contenant la
-            configuration en provenance de VigiConf
-        @type  confdb_path: C{str}
+        @param confdb: instance de la base de configuration en provenance de
+            VigiConf
+        @type  confdb: C{vigilo.connector_metro.confdb.MetroConfDB}
         """
         super(BusToRRDtool, self).__init__()
         self.confdb = confdb

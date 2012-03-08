@@ -18,7 +18,7 @@ from vigilo.connector.conffile import ConfDB
 class MetroConfDB(ConfDB):
     """
     Accès à la configuration du connector-metro fournie par VigiConf (dans une
-        base SQLite)
+    base SQLite)
     """
 
 

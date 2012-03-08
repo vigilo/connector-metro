@@ -121,15 +121,14 @@ class RRDToolManager(object):
         """
         Crée un nouveau fichier RRD avec la configuration adéquate.
 
-        @param filename: Nom du fichier RRD à générer, le nom de l'indicateur
-            doit être encodé avec urllib.quote_plus (RFC 1738).
-        @type  filename: C{str}
-        @param msgdata: Dictionnaire décrivant la source de données, contenant les
-            clés suivantes :
-             - C{host}: Nom de l'hôte.
-             - C{datasource}: Nom de l'indicateur.
-             - C{timestamp}: Timestamp UNIX de la mise à jour.
-        @type msgdata: C{dict}
+         - C{filename}: Nom du fichier RRD à générer, le nom de l'indicateur
+           doit être encodé avec urllib.quote_plus (RFC 1738).
+
+         - C{msgdata}: Dictionnaire décrivant la source de données, contenant les
+           clés suivantes :
+            - C{host}: Nom de l'hôte.
+            - C{datasource}: Nom de l'indicateur.
+            - C{timestamp}: Timestamp UNIX de la mise à jour.
         """
         # to avoid an error just after creating the rrd file :
         # (minimum one second step)
