@@ -6,7 +6,7 @@ Version:    @VERSION@
 Release:    @RELEASE@%{?dist}
 Source0:    %{name}-%{version}.tar.gz
 URL:        @URL@
-Group:      System/Servers
+Group:      Applications/System
 BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
 License:    GPLv2
 Buildarch:  noarch
@@ -34,7 +34,7 @@ This application is part of the Vigilo Project <http://vigilo-project.org>
 
 %package    -n vigilo-rrdcached
 Summary:    RRD cache daemon
-Group:      System/Servers
+Group:      Applications/System
 Requires:   rrdtool >= 1.4
 # a cause des droits sur les fichiers (vigilo-metro)
 Requires(pre):   %{name}
