@@ -110,7 +110,7 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc COPYING.txt
 %attr(755,root,root) %{_bindir}/*
-%attr(744,root,root) %{_initrddir}/%{name}
+%attr(755,root,root) %{_initrddir}/%{name}
 %dir %{_sysconfdir}/vigilo/
 %dir %{_sysconfdir}/vigilo/%{module}
 %attr(640,root,vigilo-metro) %config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
@@ -126,7 +126,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -n vigilo-rrdcached
 %defattr(644,root,root,755)
-%attr(744,root,root) %{_initrddir}/vigilo-rrdcached
+%attr(755,root,root) %{_initrddir}/vigilo-rrdcached
 %config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/vigilo-rrdcached
 
