@@ -73,7 +73,7 @@ class BusToRRDtool(MessageHandler):
         en consommant la file d'attente)
 
         @param msg: Message à transmettre
-        @type msg: C{twisted.words.test.domish Xml}
+        @type msg: C{dict}
         """
         d = self._parse_message(msg)
         d.addCallback(self.rrdtool.createIfNeeded)
