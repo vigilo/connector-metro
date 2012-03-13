@@ -38,6 +38,7 @@ Group:      Applications/System
 Requires:   rrdtool >= 1.4
 # a cause des droits sur les fichiers (vigilo-metro)
 Requires(pre):   %{name}
+Requires(pre):   rpm-helper
 
 %description -n vigilo-rrdcached
 This contains an init script and configuration files to use the RRD cache
@@ -93,7 +94,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -f %{name}.lang
 %defattr(644,root,root,755)
-%doc COPYING.txt
+%doc COPYING.txt README.txt
 %attr(755,root,root) %{_bindir}/*
 %attr(755,root,root) %{_initrddir}/%{name}
 %dir %{_sysconfdir}/vigilo/
@@ -111,6 +112,7 @@ rm -rf $RPM_BUILD_ROOT
 
 %files -n vigilo-rrdcached
 %defattr(644,root,root,755)
+%doc COPYING.txt README.txt
 %attr(755,root,root) %{_initrddir}/vigilo-rrdcached
 %config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/vigilo-rrdcached
