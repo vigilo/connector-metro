@@ -123,7 +123,7 @@ class BusToRRDtoolTestCase(unittest.TestCase):
         def cb(r):
             self.assertFalse(self.btr.rrdtool.createIfNeeded.called)
             self.assertFalse(self.btr.rrdtool.run.called)
-            self.assertEqual(self.btr._messages_forwarded, -1)
+            self.assertEqual(self.btr._messages_received, -1)
         d.addCallback(cb)
         return d
 
@@ -207,7 +207,7 @@ class BusToRRDtoolTestCase(unittest.TestCase):
         d = self.btr.getStats()
         def cb(r):
             self.assertEqual(r, {
-                'forwarded': 0,
+                'received': 0,
                 'pds_count': 4,
                 'illegal_updates': 0,
             })

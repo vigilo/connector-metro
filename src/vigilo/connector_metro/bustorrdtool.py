@@ -148,7 +148,7 @@ class BusToRRDtool(MessageHandler):
             LOGGER.error(error_msg)
         elif (err_class == NotInConfiguration or
               err_class == WrongMessageType):
-            self._messages_forwarded -= 1
+            self._messages_received -= 1
             #LOGGER.debug(str(f.value))
         elif err_class == RRDToolError:
             # Le message de rrdtool ne dépend pas de la locale,
