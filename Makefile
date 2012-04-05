@@ -3,8 +3,7 @@ USER := vigilo-metro
 
 all: build settings.ini
 
-include buildenv/Makefile.common
-PKGNAME := vigilo-connector-metro
+include buildenv/Makefile.common.python
 
 settings.ini: settings.ini.in
 	sed -e 's,@LOCALSTATEDIR@,$(LOCALSTATEDIR),g;s,@SYSCONFDIR@,$(SYSCONFDIR),g' $^ > $@
