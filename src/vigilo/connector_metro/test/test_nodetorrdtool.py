@@ -280,7 +280,10 @@ class NodeToRRDtoolForwarderTest(unittest.TestCase):
         for attr in required_attrs:
             ds = full_ds.copy()
             ds[attr] = None
-            result = self.ntrf._get_last_value(ds, {"host": "dummy_host"})
+            result = self.ntrf._get_last_value(
+                ("AVERAGE", ds),
+                {"host": "dummy_host"}
+            )
             self.assertTrue(result is None,
                     "l'attribut %s devrait être obligatoire" % attr)
 

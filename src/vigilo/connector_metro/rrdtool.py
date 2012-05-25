@@ -221,7 +221,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         if isinstance(args, list):
             args = " ".join(args)
         complete_cmd = "%s %s %s" % (command, filename, args)
-        #LOGGER.debug('Running this command: %s' % complete_cmd)
+        LOGGER.debug('Running this command: %s' % complete_cmd)
         try:
             # attention, unicode interdit
             self.transport.write("%s\n" % complete_cmd.encode("utf8"))
@@ -343,5 +343,3 @@ class RRDToolPool(object):
             #             self.job_count, index+1)
             return rrdtool.run(command, filename, args)
         raise NoAvailableProcess()
-
-

@@ -344,11 +344,23 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
             return perf
         ds = self.confdb.get_datasource(perf["host"], perf["datasource"],
                                         cache=True)
+        ds.addCallback(self._get_consolidation_function)
         ds.addCallback(self._get_last_value, perf)
         if self._check_thresholds_synchronously:
             return ds
 
-    def _get_last_value(self, ds, perf):
+    def _get_consolidation_function(self, ds):
+        """
+        Retourne la fonction de consolidation utilisée
+        pour l'intervalle le plus précis et propage les
+        informations concernant la source de données.
+        """
+        d = self.confdb.get_rras(ds["id"])
+        d.addCallback(lambda rras: (rras[0]['type'], ds))
+        return d
+
+    def _get_last_value(self, infos, perf):
+        cf, ds = infos
         # simple précaution, redondant avec self.confdb.has_threshold
         attrs = [
             'warning_threshold',
@@ -362,7 +374,7 @@ class NodeToRRDtoolForwarder(PubSubListener, PubSubSender):
         # récupération de la dernière valeur enregistrée
         filename = self._get_msg_filename(perf)
         last = self.rrdtool.run("fetch", filename,
-                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
+                    '%s --start -%d' % (cf, int(ds["step"]) * 2),
                     no_rrdcached=True)
         last.addCallback(self._compare_thresholds, ds)
         return last

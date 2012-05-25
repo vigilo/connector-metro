@@ -179,7 +179,8 @@ class ConfDB(object):
         properties = ["type", "xff", "step", "rows"]
         result = self._db.runQuery("SELECT %s FROM rra "
                     "LEFT JOIN pdsrra ON pdsrra.idrra = rra.idrra "
-                    "WHERE pdsrra.idperfdatasource = ?"
+                    "WHERE pdsrra.idperfdatasource = ? "
+                    'ORDER BY "order" ASC'
                     % ", ".join(properties), (dsid,) )
         def format_result(rows, properties):
             rras = []
