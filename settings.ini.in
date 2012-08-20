@@ -20,6 +20,8 @@ queue = connector-metro-localhost
 
 # Liste des abonnements du connecteur, séparés par des virgules.
 # Si la liste est vide, mettre uniquement une virgule.
+# Syntaxe : <nom-du-noeud>[:<clé-de-routage>]
+# Exemple : perf
 subscriptions = perf
 
 # Le trafic lié au bus doit-il être enregistré dans les logs ?
