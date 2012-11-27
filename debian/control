@@ -1,0 +1,38 @@
+Source: vigilo-connector-metro
+Section: python
+Priority: extra
+Maintainer: Vigilo Team <contact@projet-vigilo.org>
+Build-Depends:
+ debhelper (>= 7.0.50~),
+ python (>= 2.6.6-3~),
+ python-setuptools,
+ python-all
+Standards-Version: 3.8.4
+Homepage: http://www.projet-vigilo.org/
+X-Python-Version: >= 2.5
+
+Package: vigilo-connector-metro
+Architecture: all
+Suggests: vigilo-connector-metro-doc
+Depends:
+ ${misc:Depends},
+ ${python:Depends},
+ sqlite3,
+ rrdtool,
+ vigilo-vigiconf-local,
+ adduser (>= 3.11),
+ grep,
+ passwd
+Description: Vigilo metrology connector
+ Store performance data from the Vigilo
+ message bus in RRD files.
+
+Package: vigilo-connector-metro-doc
+Architecture: all
+Section: doc
+Depends: ${sphinxdoc:Depends} ${misc:Depends}
+Description: Vigilo metrology connector (documentation)
+ Store performance data from the Vigilo
+ message bus in RRD files.
+ .
+ This package contains documentation about the Vigilo-metro connector.
