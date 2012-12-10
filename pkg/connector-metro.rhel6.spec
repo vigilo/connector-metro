@@ -43,7 +43,7 @@ Group:      Applications/System
 Requires:   rrdtool >= 1.4
 # a cause des droits sur les fichiers (vigilo-metro)
 Requires(pre):   %{name}
-Requires(pre):   rpm-helper
+Requires(pre):   shadow-utils
 
 %description -n vigilo-rrdcached
 This contains an init script and configuration files to use the RRD cache
