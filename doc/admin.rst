@@ -12,7 +12,7 @@ Afin de pouvoir faire fonctionner le connecteur de métrologie, l'installation
 préalable des logiciels suivants est requise :
 
 * python (>= 2.5), sur la machine où le connecteur est installé
-* ejabberd (>= 2.1), éventuellement sur une machine distante
+* rabbitmq (>= 2.7.1), éventuellement sur une machine distante
 * rrdtool (>= 1.3), sur la machine où le connecteur est installé
 
 
