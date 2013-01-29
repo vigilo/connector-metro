@@ -36,6 +36,7 @@ def makeService(options):
     # Client du bus
     client = client_factory(settings)
     client.setServiceParent(root_service)
+    providers = []
 
     # Configuration
     try:
@@ -71,6 +72,7 @@ def makeService(options):
         threshold_checker = ThresholdChecker(rrdtool, confdb)
         bus_publisher = buspublisher_factory(settings, client)
         bus_publisher.registerProducer(threshold_checker, streaming=True)
+        providers.append(bus_publisher)
     else:
         threshold_checker = None
 
@@ -79,10 +81,12 @@ def makeService(options):
     bustorrdtool.setClient(client)
     subs = parseSubscriptions(settings)
     bustorrdtool.subscribe(settings["bus"]["queue"], subs)
+    providers.append(bustorrdtool)
 
     # Statistiques
     from vigilo.connector.status import statuspublisher_factory
+
     status_publisher = statuspublisher_factory(settings, client,
-            providers=(bustorrdtool, bus_publisher))
+                                               providers=providers)
 
     return root_service
