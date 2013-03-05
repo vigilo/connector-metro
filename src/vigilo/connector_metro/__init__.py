@@ -80,7 +80,9 @@ def makeService(options):
     bustorrdtool = BusToRRDtool(confdb, rrdtool, threshold_checker)
     bustorrdtool.setClient(client)
     subs = parseSubscriptions(settings)
-    bustorrdtool.subscribe(settings["bus"]["queue"], subs)
+    queue = settings["bus"]["queue"]
+    queue_messages_ttl = int(settings['bus'].get('queue_messages_ttl', 0))
+    bustorrdtool.subscribe(queue, queue_messages_ttl, subs)
     providers.append(bustorrdtool)
 
     # Statistiques

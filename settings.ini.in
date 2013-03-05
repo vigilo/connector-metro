@@ -18,10 +18,16 @@ use_ssl = False
 # Nom de la file d'attente du connecteur
 queue = connector-metro-localhost
 
+# Durée de vie des messages en secondes (0 si infinie)
+# Note : La durée de vie s'applique directement au niveau de la file d'attente
+#        du connecteur, si un message dépasse cette durée de vie le bus le
+#        supprimera.
+#queue_messages_ttl = 0
+
 # Liste des abonnements du connecteur, séparés par des virgules.
 # Si la liste est vide, mettre uniquement une virgule.
 # Syntaxe : <nom-du-noeud>[:<clé-de-routage>]
-# Exemple : perf
+# Exemple : foo:bar, baz:qux
 subscriptions = perf
 
 # Le trafic lié au bus doit-il être enregistré dans les logs ?
@@ -84,6 +90,9 @@ rrd_bin = /usr/bin/rrdtool
 [publications]
 # Types de messages et le nom de l'exchange à utiliser pour leur publication.
 # Par défaut, un exchange du même nom que le type est utilisé.
+# Les entrées dans cette section sont de la forme :
+#     type_de_message = exchange[:duree_de_vie_en_secondes]
+#----------------------------------------------------
 #perf = perf
 #nagios = nagios
 
