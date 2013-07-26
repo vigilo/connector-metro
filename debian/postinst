@@ -39,14 +39,14 @@ case "$1" in
         test -d $USER_HOME || mkdir $USER_HOME
 
         # 3. create user if not existing
-        if ! getent passwd | grep -q "^$USER_USER:"; then
-            echo -n "Adding system user $USER_USER.."
+        if ! getent passwd | grep -q "^$USER:"; then
+            echo -n "Adding system user $USER.."
             adduser --quiet \
                     --system \
                     --ingroup $USER_GROUP \
                     --no-create-home \
                     --disabled-password \
-                    $USER_USER 2>/dev/null || true
+                    $USER 2>/dev/null || true
             echo "..done"
         fi
 
@@ -64,7 +64,7 @@ case "$1" in
             /var/run/vigilo-rrdcached
         chmod 755 $USERER_HOME
 
-        chown root:$USER_USER /etc/vigilo/$MODULE/settings.ini
+        chown root:$USER /etc/vigilo/$MODULE/settings.ini
         chmod 640 /etc/vigilo/$MODULE/settings.ini
 
         twistd --help > /dev/null 2>&1
