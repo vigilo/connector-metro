@@ -62,7 +62,7 @@ case "$1" in
             /var/log/vigilo/$MODULE \
             /var/run/$PKGNAME \
             /var/run/vigilo-rrdcached
-        chmod 755 $USERER_HOME
+        chmod 755 $USER_HOME
 
         chown root:$USER /etc/vigilo/$MODULE/settings.ini
         chmod 640 /etc/vigilo/$MODULE/settings.ini
