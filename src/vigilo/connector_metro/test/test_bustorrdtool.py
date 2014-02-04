@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # vim: set et sw=4 ts=4 ai:
 # pylint: disable-msg=R0904,C0111,W0613,W0212
-# Copyright (C) 2006-2013 CS-SI
+# Copyright (C) 2006-2014 CS-SI
 # License: GNU GPL v2 <http://www.gnu.org/licenses/gpl-2.0.html>
 
 from __future__ import absolute_import
