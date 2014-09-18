@@ -101,7 +101,7 @@ class MetroConfDB(ConfDB):
 
 
     def get_datasource(self, hostname, dsname, cache=False):
-        properties = ["id", "type", "step", "heartbeat",
+        properties = ["id", "type", "PDP_step", "heartbeat",
                       "min", "max",
                       "factor",
                       "warning_threshold", "critical_threshold",
@@ -136,7 +136,7 @@ class MetroConfDB(ConfDB):
     def get_rras(self, dsid):
         if self._db is None:
             return defer.succeed([])
-        properties = ["type", "xff", "step", "rows"]
+        properties = ["type", "xff", "RRA_step", "rows"]
         result = self._db.runQuery("SELECT %s FROM rra "
                     "LEFT JOIN pdsrra ON pdsrra.idrra = rra.idrra "
                     "WHERE pdsrra.idperfdatasource = ? "

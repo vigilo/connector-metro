@@ -162,12 +162,12 @@ class RRDToolManager(object):
             raise NotInConfiguration()
 
         ds = yield self.confdb.get_datasource(host, ds_name)
-        rrd_cmd = ["--step", str(ds["step"]), "--start", str(timestamp)]
+        rrd_cmd = ["--step", str(ds["PDP_step"]), "--start", str(timestamp)]
         rras = yield self.confdb.get_rras(ds["id"])
         for rra in rras:
             rrd_cmd.append("RRA:%s:%s:%s:%s" %
                            (rra["type"], rra["xff"],
-                            rra["step"], rra["rows"]))
+                            rra["RRA_step"], rra["rows"]))
 
         rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
                        (ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
@@ -205,7 +205,7 @@ class RRDToolManager(object):
         # récupération de la dernière valeur enregistrée
         filename = self.getFilename(msg)
         d = self.rrdtool.run("fetch", filename,
-                    'AVERAGE --start -%d' % (int(ds["step"]) * 2),
+                    'AVERAGE --start -%d' % (int(ds["PDP_step"]) * 2),
                     no_rrdcached=True)
         d.addCallback(parse_rrdtool_response)
         return d

@@ -116,7 +116,7 @@ class ThresholdCheckerTestCase(unittest.TestCase):
         }
         ds = {"hostname": "server1.example.com",
               "datasource": "Load",
-              "step": 300,
+              "PDP_step": 300,
               "factor": 1,
               "warning_threshold": "0.8",
               "critical_threshold": "0.9",
@@ -176,7 +176,7 @@ class ThresholdCheckerTestCase(unittest.TestCase):
         }
         ds = {"hostname": u"Host éçà",
               "datasource": u"PDS éçà",
-              "step": 300,
+              "PDP_step": 300,
               "factor": 1,
               "warning_threshold": u"0.8",
               "critical_threshold": u"0.9",

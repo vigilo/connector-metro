@@ -170,7 +170,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                "datasource": "dummy_datasource"}
         full_ds = {"host": "dummy_host",
                    "datasource": "dummy_datasource",
-                   "step": 300,
+                   "PDP_step": 300,
                    "warning_threshold": "42",
                    "critical_threshold": "43",
                    "nagiosname": "Dummy Service",
@@ -204,7 +204,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                "datasource": "dummy_datasource éçà"}
         ds = {"host": "dummy_host éçà",
               "datasource": "dummy_datasource éçà",
-              "step": 300,
+              "PDP_step": 300,
               "warning_threshold": "42",
               "critical_threshold": "43",
               "nagiosname": "Dummy Service",
@@ -227,7 +227,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                "datasource": "dummy_datasource éçà"}
         ds = {"host": "dummy_host éçà",
               "datasource": "dummy_datasource éçà",
-              "step": 300,
+              "PDP_step": 300,
               "warning_threshold": "42",
               "critical_threshold": "43",
               "nagiosname": "Dummy Service",
