@@ -48,16 +48,30 @@ class RRDToolError(Exception):
 
 
 def parse_rrdtool_response(response):
+    """
+    Analyse la réponse de RRDTool
+
+    @param response: La réponse de RRDTool.
+    @type  response: C{str}
+    @return: la dernière valeur renvoyée par RRDTool.
+    @rtype: C{float} or C{None}
+    """
     value = None
     for line in response.split("\n"):
         if not line.count(": ") == 1:
             continue
         timestamp, current_value = line.strip().split(": ")
-        if current_value == "nan":
+        try:
+            # python convertit tout seul la notation exposant
+            current_value = float(current_value)
+        except ValueError:
+            continue
+        # test pour les float NaN (Not a Number)
+        if current_value != current_value:
             continue
         value = current_value
-    if value is not None:
-        value = float(value) # python convertit tout seul la notation exposant
+    if value is None:
+        LOGGER.warning(_("Error in rrdtool output: %s"), response)
     return value
 
 
