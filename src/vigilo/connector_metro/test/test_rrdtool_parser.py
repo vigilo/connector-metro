@@ -14,7 +14,7 @@ class RRDToolParserTestCase(unittest.TestCase):
 
     def test_only_nan(self):
         """Sortie de RRDTool: uniquement des NaN"""
-        output = "123456789: nan\n"
+        output = "123456789: nan\n123456789: -nan\n123456789: NaN\n123456789: -NaN\n"
         self.assertTrue(parse_rrdtool_response(output) is None)
 
     def test_simple(self):
@@ -40,4 +40,9 @@ class RRDToolParserTestCase(unittest.TestCase):
     def test_ignore_nan(self):
         """Les lignes avec NaN doivent être ignorées"""
         output = "123456789: 42\n123456789: nan\n"
+        self.assertEqual(parse_rrdtool_response(output), 42)
+
+    def test_ignore_not_convertible_to_float(self):
+        """Les valeurs non convertibles en float doivent être ignorées"""
+        output = "123456789: 42\n123456789: abc\n"
         self.assertEqual(parse_rrdtool_response(output), 42)
