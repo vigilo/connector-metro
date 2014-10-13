@@ -107,7 +107,12 @@ class BusToRRDtool(MessageHandler):
                 float(msg["value"])
             except ValueError:
                 return defer.fail(InvalidMessage((
-                        _("Invalid metrology value: %s") % msg["value"]
+                        _("Invalid metrology value for datasource %(ds)s "
+                          "on host %(host)s: %(value)s") % {
+                            'value': msg["value"],
+                            'ds': msg['datasource'],
+                            'host': msg['host'],
+                          }
                     ).encode('utf-8')))
 
         d = self.confdb.has_host(msg["host"])
