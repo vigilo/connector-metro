@@ -8,7 +8,7 @@ msgstr ""
 "Project-Id-Version:  vigilo.connector-metro\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
 "POT-Creation-Date: 2010-11-19 12:03+0100\n"
-"PO-Revision-Date: 2014-09-26 16:39+0200\n"
+"PO-Revision-Date: 2014-10-13 11:40+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: fr <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n > 1)\n"
@@ -37,15 +37,17 @@ msgstr "Message de performance non valide (il manque la balise '%(tag)s')"
 
 #: src/vigilo/connector_metro/bustorrdtool.py:110
 #, python-format
-msgid "Invalid metrology value: %s"
-msgstr "Valeur de métrologie non valide : %s"
+msgid "Invalid metrology value for datasource %(ds)s on host %(host)s: %(value)s"
+msgstr ""
+"Valeur de métrologie non valide pour l'indicateur %(ds)s de l'hôte "
+"%(host)s : %(value)s"
 
-#: src/vigilo/connector_metro/bustorrdtool.py:117
+#: src/vigilo/connector_metro/bustorrdtool.py:122
 #, python-format
 msgid "Skipping perf update for host %s"
 msgstr "Mise à jour de la donnée de performance sur l'hôte %s ignorée"
 
-#: src/vigilo/connector_metro/bustorrdtool.py:159
+#: src/vigilo/connector_metro/bustorrdtool.py:164
 #, python-format
 msgid "RRDtool could not update the file %(filename)s. Message: %(msg)s"
 msgstr ""
@@ -103,11 +105,11 @@ msgstr "Impossible d'écrire dans le dossier '%(dir)s'"
 #: src/vigilo/connector_metro/rrdtool.py:401
 #, python-format
 msgid "Started RRDtool subprocess: pid %(pid)d"
-msgstr "Processus de RRDtool démarré: pid %(pid)d"
+msgstr "Sous-processus de RRDtool démarré : pid %(pid)d"
 
 #: src/vigilo/connector_metro/rrdtool.py:423
 msgid "The process has not yet completed the previous job"
-msgstr "Le process n'a pas encore fini le job précédent"
+msgstr "Le processus n'a pas encore fini le job précédent"
 
 #: src/vigilo/connector_metro/rrdtool.py:461
 msgid "No deferred available in _handle_result(), this should not happen"

@@ -9,8 +9,8 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vigilo-connector-metro 3.5\n"
 "Report-Msgid-Bugs-To: contact@projet-vigilo.org\n"
-"POT-Creation-Date: 2014-09-26 16:39+0200\n"
-"PO-Revision-Date: 2014-09-26 16:39+0200\n"
+"POT-Creation-Date: 2014-10-13 11:40+0200\n"
+"PO-Revision-Date: 2014-10-13 11:40+0200\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: en <LL@li.org>\n"
 "Plural-Forms: nplurals=2; plural=(n != 1)\n"
@@ -39,15 +39,15 @@ msgstr "Not a valid performance message (missing '%(tag)s' tag)"
 
 #: src/vigilo/connector_metro/bustorrdtool.py:110
 #, python-format
-msgid "Invalid metrology value: %s"
-msgstr "Invalid metrology value: %s"
+msgid "Invalid metrology value for datasource %(ds)s on host %(host)s: %(value)s"
+msgstr "Invalid metrology value for datasource %(ds)s on host %(host)s: %(value)s"
 
-#: src/vigilo/connector_metro/bustorrdtool.py:117
+#: src/vigilo/connector_metro/bustorrdtool.py:122
 #, python-format
 msgid "Skipping perf update for host %s"
 msgstr "Skipping perf update for host %s"
 
-#: src/vigilo/connector_metro/bustorrdtool.py:159
+#: src/vigilo/connector_metro/bustorrdtool.py:164
 #, python-format
 msgid "RRDtool could not update the file %(filename)s. Message: %(msg)s"
 msgstr "RRDtool could not update the file %(filename)s. Message: %(msg)s"
