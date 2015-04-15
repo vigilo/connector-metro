@@ -1,15 +1,15 @@
 # Translations template for vigilo-connector-metro.
-# Copyright (C) 2014 ORGANIZATION
+# Copyright (C) 2015 ORGANIZATION
 # This file is distributed under the same license as the vigilo-connector-metro
 # project.
-# FIRST AUTHOR <EMAIL@ADDRESS>, 2014.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2015.
 #
 #, fuzzy
 msgid ""
 msgstr ""
 "Project-Id-Version: vigilo-connector-metro 3.5\n"
 "Report-Msgid-Bugs-To: contact@projet-vigilo.org\n"
-"POT-Creation-Date: 2014-10-13 11:40+0200\n"
+"POT-Creation-Date: 2015-04-15 10:54+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -51,71 +51,71 @@ msgstr ""
 
 #: src/vigilo/connector_metro/rrdtool.py:74
 #, python-format
-msgid "Error in rrdtool output: %s"
+msgid "Error in rrdtool output (%(filename)s): %(output)s"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:157
+#: src/vigilo/connector_metro/rrdtool.py:159
 #, python-format
 msgid "Host '%(host)s' with datasource '%(ds)s' not found in the configuration"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:178
+#: src/vigilo/connector_metro/rrdtool.py:180
 #, python-format
 msgid "RRDtool could not create the file: %(filename)s. Message: %(msg)s"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:284
+#: src/vigilo/connector_metro/rrdtool.py:295
 #, python-format
 msgid "Unable to create the directory '%s'"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:321
+#: src/vigilo/connector_metro/rrdtool.py:332
 #, python-format
 msgid "Unable to start \"%(rrdtool)s\". Make sure the path is correct."
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:324
+#: src/vigilo/connector_metro/rrdtool.py:335
 #, python-format
 msgid ""
 "Unable to start \"%(rrdtool)s\". Make sure RRDtool is installed and you have "
 "permissions to use it."
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:338
+#: src/vigilo/connector_metro/rrdtool.py:349
 #, python-format
 msgid "The RRD directory does not exist: %s"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:342
+#: src/vigilo/connector_metro/rrdtool.py:353
 #, python-format
 msgid "Unable to write in the directory '%(dir)s'"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:401
+#: src/vigilo/connector_metro/rrdtool.py:412
 #, python-format
 msgid "Started RRDtool subprocess: pid %(pid)d"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:423
+#: src/vigilo/connector_metro/rrdtool.py:434
 msgid "The process has not yet completed the previous job"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:461
+#: src/vigilo/connector_metro/rrdtool.py:472
 msgid "No deferred available in _handle_result(), this should not happen"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:488
+#: src/vigilo/connector_metro/rrdtool.py:499
 msgid "The RRDTool process exited normally"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:491
+#: src/vigilo/connector_metro/rrdtool.py:502
 #, python-format
 msgid ""
 "The RRDTool process was terminated abnormally with exit code %(rcode)s and "
 "message: %(msg)s"
 msgstr ""
 
-#: src/vigilo/connector_metro/rrdtool.py:501
+#: src/vigilo/connector_metro/rrdtool.py:512
 msgid "Restarting..."
 msgstr ""
 

@@ -47,7 +47,7 @@ class RRDToolError(Exception):
 
 
 
-def parse_rrdtool_response(response):
+def parse_rrdtool_response(response, filename):
     """
     Analyse la réponse de RRDTool
 
@@ -71,7 +71,9 @@ def parse_rrdtool_response(response):
             continue
         value = current_value
     if value is None:
-        LOGGER.warning(_("Error in rrdtool output: %s"), response)
+        LOGGER.warning(_("Error in rrdtool output (%(filename)s): %(output)s"),
+            {"filename": filename,
+             "output": response})
     return value
 
 
@@ -193,6 +195,16 @@ class RRDToolManager(object):
 
 
     def getLastValue(self, ds, msg):
+        """
+        Récupération de la dernière valeur présente dans un fichier RRD.
+
+        @param ds: Le dictionnaire décrivant la source de données.
+        @type  ds: C{dict}
+        @param msg: Un message contenant le nom du fichier RRD.
+        @type  msg: C{dict}
+        @return: La dernière valeur renvoyée par RRDTool.
+        @rtype: C{float} or C{None}
+        """
         attrs = [
             'warning_threshold',
             'critical_threshold',
@@ -207,7 +219,7 @@ class RRDToolManager(object):
         d = self.rrdtool.run("fetch", filename,
                     'AVERAGE --start -%d' % (int(ds["PDP_step"]) * 2),
                     no_rrdcached=True)
-        d.addCallback(parse_rrdtool_response)
+        d.addCallback(parse_rrdtool_response, filename)
         return d
 
     # Proxies
