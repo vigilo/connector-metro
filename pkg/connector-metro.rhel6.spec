@@ -64,8 +64,6 @@ make install_pkg \
     SYSCONFDIR=%{_sysconfdir} \
     LOCALSTATEDIR=%{_localstatedir} \
     PYTHON=%{__python}
-mkdir -p $RPM_BUILD_ROOT/%{_tmpfilesdir}
-install -m 644 pkg/%{name}.conf $RPM_BUILD_ROOT/%{_tmpfilesdir}
 
 %find_lang %{name}
 
@@ -78,7 +76,6 @@ exit 0
 %post
 /sbin/chkconfig --add %{name} || :
 %{_libexecdir}/twisted-dropin-cache >/dev/null 2>&1 || :
-%tmpfiles_create %{_tmpfilesdir}/%{name}.conf
 
 %preun
 if [ $1 = 0 ]; then
@@ -133,12 +130,10 @@ rm -rf $RPM_BUILD_ROOT
 %doc COPYING.txt README.txt
 %attr(755,root,root) %{_initrddir}/vigilo-rrdcached
 %config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
-%attr(644,root,root) %{_tmpfilesdir}/%{name}.conf
+%attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/vigilo-rrdcached
+
 
 %changelog
-* Thu Mar 16 2017 Yves Ouattara <yves.ouattara@c-s.fr>
- - Rebuild for RHEL7.
-
 * Fri Jan 21 2011 Vincent Quéméner <vincent.quemener@c-s.fr>
 - Rebuild for RHEL6.
 
