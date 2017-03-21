@@ -66,6 +66,7 @@ make install_pkg \
     PYTHON=%{__python}
 mkdir -p $RPM_BUILD_ROOT/%{_tmpfilesdir}
 install -m 644 pkg/%{name}.conf $RPM_BUILD_ROOT/%{_tmpfilesdir}
+install -m 644 pkg/vigilo-rrdcached.conf $RPM_BUILD_ROOT/%{_tmpfilesdir}
 
 %find_lang %{name}
 
@@ -94,6 +95,7 @@ fi
 
 %post -n vigilo-rrdcached
 /sbin/chkconfig --add vigilo-rrdcached || :
+%tmpfiles_create %{_tmpfilesdir}/vigilo-rrdcached.conf
 
 %preun -n vigilo-rrdcached
 if [ $1 = 0 ]; then
@@ -126,18 +128,18 @@ rm -rf $RPM_BUILD_ROOT
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/lib/vigilo/%{module}
 %dir %{_localstatedir}/log/vigilo
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/log/vigilo/%{module}
-%attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/run/%{name}
+%attr(644,root,root) %{_tmpfilesdir}/%{name}.conf
 
 %files -n vigilo-rrdcached
 %defattr(644,root,root,755)
 %doc COPYING.txt README.txt
 %attr(755,root,root) %{_initrddir}/vigilo-rrdcached
 %config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
-%attr(644,root,root) %{_tmpfilesdir}/%{name}.conf
+%attr(644,root,root) %{_tmpfilesdir}/vigilo-rrdcached.conf
 
 %changelog
 * Thu Mar 16 2017 Yves Ouattara <yves.ouattara@c-s.fr>
- - Rebuild for RHEL7.
+- Rebuild for RHEL7.
 
 * Fri Jan 21 2011 Vincent Quéméner <vincent.quemener@c-s.fr>
 - Rebuild for RHEL6.
