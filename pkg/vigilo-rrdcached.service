@@ -1,0 +1,18 @@
+[Unit]
+Description=Efficient in-memory cache for RRD databases
+
+After=syslog.service
+After=rsyslog.service
+After=network.target
+
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+Type=simple
+Environment=OPTIONS=
+EnvironmentFile=-/etc/sysconfig/vigilo-rrdcached $OPTIONS
+User=vigilo-metro
+Restart=on-failure
+ExecStart=/usr/bin/rrdcached

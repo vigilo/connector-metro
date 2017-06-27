@@ -11,6 +11,7 @@ BuildRoot:  %{_tmppath}/%{name}-%{version}-%{release}-build
 License:    GPLv2
 Buildarch:  noarch
 
+BuildRequires:   systemd
 BuildRequires:   python-distribute
 BuildRequires:   python-babel
 
@@ -22,11 +23,6 @@ Requires:   sqlite >= 3
 
 # Init
 Requires(pre): shadow-utils
-Requires(post): chkconfig
-Requires(preun): chkconfig
-# This is for /sbin/service
-Requires(preun): initscripts
-Requires(postun): initscripts
 
 # VigiConf
 Requires:   vigilo-vigiconf-local
@@ -40,6 +36,9 @@ This application is part of the Vigilo Project <http://vigilo-project.org>
 %package    -n vigilo-rrdcached
 Summary:    RRD cache daemon
 Group:      Applications/System
+
+BuildRequires:   systemd
+
 Requires:   rrdtool >= 1.4
 # a cause des droits sur les fichiers (vigilo-metro)
 Requires(pre):   %{name}
@@ -58,11 +57,12 @@ This package is part of the Vigilo Project <http://vigilo-project.org>
 
 %install
 rm -rf $RPM_BUILD_ROOT
-make install_pkg \
+make install_pkg_systemd \
     DESTDIR=$RPM_BUILD_ROOT \
     PREFIX=%{_prefix} \
     SYSCONFDIR=%{_sysconfdir} \
     LOCALSTATEDIR=%{_localstatedir} \
+    SYSTEMDDIR=%{_unitdir} \
     PYTHON=%{__python}
 mkdir -p $RPM_BUILD_ROOT/%{_tmpfilesdir}
 install -m 644 pkg/%{name}.conf $RPM_BUILD_ROOT/%{_tmpfilesdir}
@@ -77,37 +77,26 @@ getent passwd vigilo-metro >/dev/null || useradd -r -g vigilo-metro -d %{_locals
 exit 0
 
 %post
-/sbin/chkconfig --add %{name} || :
+%systemd_post %{name}.service
 %{_libexecdir}/twisted-dropin-cache >/dev/null 2>&1 || :
 %tmpfiles_create %{_tmpfilesdir}/%{name}.conf
 
 %preun
-if [ $1 = 0 ]; then
-    /sbin/service %{name} stop > /dev/null 2>&1 || :
-    /sbin/chkconfig --del %{name} || :
-fi
+%systemd_preun %{name}.service
 
 %postun
-if [ "$1" -ge "1" ] ; then
-    /sbin/service %{name} condrestart > /dev/null 2>&1 || :
-fi
+%systemd_postun_with_restart %{name}.service
 %{_libexecdir}/twisted-dropin-cache >/dev/null 2>&1 || :
 
 %post -n vigilo-rrdcached
-/sbin/chkconfig --add vigilo-rrdcached || :
+%systemd_post vigilo-rrdcached.service
 %tmpfiles_create %{_tmpfilesdir}/vigilo-rrdcached.conf
 
 %preun -n vigilo-rrdcached
-if [ $1 = 0 ]; then
-    /sbin/service vigilo-rrdcached stop > /dev/null 2>&1 || :
-    /sbin/chkconfig --del vigilo-rrdcached || :
-fi
+%systemd_preun vigilo-rrdcached.service
 
 %postun -n vigilo-rrdcached
-if [ "$1" -ge "1" ] ; then
-    /sbin/service vigilo-rrdcached condrestart > /dev/null 2>&1 || :
-fi
-
+%systemd_postun_with_restart vigilo-rrdcached.service
 
 %clean
 rm -rf $RPM_BUILD_ROOT
@@ -116,11 +105,9 @@ rm -rf $RPM_BUILD_ROOT
 %defattr(644,root,root,755)
 %doc COPYING.txt README.txt
 %attr(755,root,root) %{_bindir}/*
-%attr(755,root,root) %{_initrddir}/%{name}
 %dir %{_sysconfdir}/vigilo/
 %dir %{_sysconfdir}/vigilo/%{module}
 %attr(640,root,vigilo-metro) %config(noreplace) %{_sysconfdir}/vigilo/%{module}/settings.ini
-%config(noreplace) %{_sysconfdir}/sysconfig/%{name}
 %{python_sitelib}/vigilo*
 %{python_sitelib}/twisted*
 %dir %{_localstatedir}/lib/vigilo
@@ -129,15 +116,19 @@ rm -rf $RPM_BUILD_ROOT
 %dir %{_localstatedir}/log/vigilo
 %attr(-,vigilo-metro,vigilo-metro) %{_localstatedir}/log/vigilo/%{module}
 %attr(644,root,root) %{_tmpfilesdir}/%{name}.conf
+%attr(644,root,root) %{_unitdir}/%{name}.service
+%attr(644,root,root) %{_unitdir}/%{name}@.service
 
 %files -n vigilo-rrdcached
 %defattr(644,root,root,755)
 %doc COPYING.txt README.txt
-%attr(755,root,root) %{_initrddir}/vigilo-rrdcached
-%config(noreplace) %{_sysconfdir}/sysconfig/vigilo-rrdcached
 %attr(644,root,root) %{_tmpfilesdir}/vigilo-rrdcached.conf
+%attr(644,root,root) %{_unitdir}/vigilo-rrdcached.service
 
 %changelog
+* Tue Jun 27 2017 François Poirotte <francois.poirotte@c-s.fr>
+- Add support for systemd
+
 * Thu Mar 16 2017 Yves Ouattara <yves.ouattara@c-s.fr>
 - Rebuild for RHEL7.
 
