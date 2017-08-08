@@ -21,4 +21,4 @@ Restart=on-failure
 # Evite la création de services dont le nom d'instance n'est pas un nombre,
 # ou bien est un nombre inférieur à 1
 ExecStartPre=/usr/bin/test %i -eq %i -a %i -gt 1
-ExecStart=/usr/bin/vigilo-metro -d /var/lib/vigilo/correlator --pidfile '' -n vigilo-metro --config /etc/vigilo/connector-metro/settings-%i.ini --id %i
+ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/correlator --pidfile '' -n vigilo-metro --config /etc/vigilo/connector-metro/settings-%i.ini --id %i

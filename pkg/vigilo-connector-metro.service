@@ -16,4 +16,4 @@ Type=simple
 EnvironmentFile=-/etc/sysconfig/vigilo-connector-metro
 User=vigilo-metro
 Restart=on-failure
-ExecStart=/usr/bin/vigilo-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro
+ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro
