@@ -12,7 +12,7 @@ WantedBy=multi-user.target
 [Service]
 Type=simple
 Environment=OPTIONS=
-EnvironmentFile=-/etc/sysconfig/vigilo-rrdcached $OPTIONS
+EnvironmentFile=-/etc/sysconfig/vigilo-rrdcached
 User=vigilo-metro
 Restart=on-failure
-ExecStart=/usr/bin/rrdcached
+ExecStart=/usr/bin/rrdcached -g -m 666 -l /var/lib/vigilo/connector-metro/rrdcached.sock -p /var/run/vigilo-rrdcached/vigilo-rrdcached.pid
