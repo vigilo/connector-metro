@@ -9,7 +9,7 @@ Test des classes RRDToolManager et RRDToolProcessProtocol
 """
 
 # Teste la creation d'un fichier RRD
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 import tempfile
 import os
@@ -65,7 +65,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                 }
         d = self.mgr.createIfNeeded(msg)
         def check(_ignored):
-            print self.mgr.rrdtool.run.call_args_list
+            print(self.mgr.rrdtool.run.call_args_list)
             self.assertEqual(len(self.mgr.rrdtool.run.call_args_list), 1)
             self.assertEqual(self.mgr.rrdtool.run.call_args_list[0][0],
                     ('create', self.rrd_base_dir+"/server1.example.com/Load.rrd",
@@ -110,7 +110,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
         #self.mgr.getOldFilename = Mock(return_value=self.rrd_base_dir+"")
         d = self.mgr.processMessage(msg)
         def check(_ignored):
-            print self.mgr.rrdtool.run.call_args_list
+            print(self.mgr.rrdtool.run.call_args_list)
             self.assertEqual(len(self.mgr.rrdtool.run.call_args_list), 1)
             self.assertEqual(self.mgr.rrdtool.run.call_args_list[0][0],
                      ('update', self.rrd_base_dir+"/server1.example.com/Load.rrd",
@@ -126,7 +126,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                 "datasource": "A B/C\\D.E%F",
                 "value": "42",
                 }
-        print self.mgr.getFilename(msg)
+        print(self.mgr.getFilename(msg))
         expected = (self.rrd_base_dir+"/server1.example.com/"
                     "A+B%2FC%5CD.E%25F.rrd")
         self.assertEqual(expected, self.mgr.getFilename(msg))
@@ -140,7 +140,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                 "datasource": "Load",
                 "value": "42",
                 }
-        print self.mgr.getFilename(msg)
+        print(self.mgr.getFilename(msg))
         expected = self.rrd_base_dir+"/A+b%2Fc.example.com/Load.rrd"
         self.assertEqual(expected, self.mgr.getFilename(msg))
 
@@ -214,7 +214,7 @@ class RRDToolManagerTestCase(unittest.TestCase):
                 "DS\n\ntimestamp: 42\n")
         d = self.mgr.getLastValue(ds, msg)
         def check(r):
-            print r
+            print(r)
             self.assertEqual(r, 42)
         d.addCallback(check)
         return d
@@ -237,9 +237,9 @@ class RRDToolManagerTestCase(unittest.TestCase):
                 "DS\n\ntimestamp: 42\n")
         d = self.mgr.getLastValue(ds, msg)
         def check_no_rrdcached(r):
-            print self.mgr.rrdtool.run.call_args_list
+            print(self.mgr.rrdtool.run.call_args_list)
             for cmd in self.mgr.rrdtool.run.call_args_list:
-                print cmd
+                print(cmd)
                 self.assertTrue("no_rrdcached" in cmd[1])
                 self.assertTrue(cmd[1]["no_rrdcached"])
         d.addCallback(check_no_rrdcached)

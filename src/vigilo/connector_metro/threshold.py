@@ -111,7 +111,7 @@ class ThresholdChecker(object):
                 status = (1, 'WARNING: %s' % last)
             else:
                 status = (0, 'OK: %s' % last)
-        except ValueError, e:
+        except ValueError as e:
             # Le seuil configuré est invalide.
             status = (3, 'UNKNOWN: Invalid threshold configuration (%s)' % e)
 

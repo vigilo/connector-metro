@@ -4,6 +4,7 @@
 # Copyright (C) 2006-2016 CS-SI
 # License: GNU GPL v2 <http://www.gnu.org/licenses/gpl-2.0.html>
 
+from __future__ import print_function
 import unittest
 
 # ATTENTION: ne pas utiliser twisted.trial, car nose va ignorer les erreurs
@@ -125,10 +126,10 @@ class ThresholdCheckerTestCase(unittest.TestCase):
               }
 
         def check_result(dummy, value, expected):
-            print "Checking results for value %r" % value
+            print("Checking results for value %r" % value)
             expected_msg = msg_tpl.copy()
             expected_msg["value"] = expected
-            print self.tc.consumer.written
+            print(self.tc.consumer.written)
             if value is None:
                 # Une valeur UNKNOWN ne doit pas générer d'alerte
                 # (on utilise la direction freshness_threshold de Nagios).
@@ -185,10 +186,10 @@ class ThresholdCheckerTestCase(unittest.TestCase):
               }
 
         def check_result(dummy, value, expected):
-            print "Checking results for value %r" % value
+            print("Checking results for value %r" % value)
             expected_msg = msg_tpl.copy()
             expected_msg["value"] = expected
-            print self.tc.consumer.written
+            print(self.tc.consumer.written)
             if value is None:
                 # Une valeur UNKNOWN ne doit pas générer d'alerte
                 # (on utilise la direction freshness_threshold de Nagios).

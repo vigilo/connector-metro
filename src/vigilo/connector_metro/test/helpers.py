@@ -3,7 +3,7 @@
 # Copyright (C) 2006-2016 CS-SI
 # License: GNU GPL v2 <http://www.gnu.org/licenses/gpl-2.0.html>
 
-from __future__ import absolute_import
+from __future__ import absolute_import, print_function
 
 from StringIO import StringIO
 
@@ -41,7 +41,7 @@ class RRDToolProcessProtocolStub(object):
         return defer.succeed(None)
     def run(self, command, filename, args):
         self.commands.append((command, filename, args))
-        print "Running: %s on %s with %r" % (command, filename, args)
+        print("Running: %s on %s with %r" % (command, filename, args))
         open(filename, "w").close() # touch filename
         return defer.succeed("")
 

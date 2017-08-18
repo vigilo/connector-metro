@@ -176,7 +176,7 @@ class RRDToolManager(object):
 
         try:
             yield self.rrdtool.run("create", filename, rrd_cmd)
-        except Exception, e:
+        except Exception as e:
             LOGGER.error(_("RRDtool could not create the file: "
                            "%(filename)s. Message: %(msg)s"),
                          { 'filename': filename,
@@ -292,7 +292,7 @@ class RRDToolPoolManager(object):
                      stat.S_IRUSR | stat.S_IWUSR | stat.S_IXUSR |\
                      stat.S_IRGRP | stat.S_IXGRP | \
                      stat.S_IROTH | stat.S_IXOTH)
-        except OSError, e:
+        except OSError as e:
             LOGGER.error(_("Unable to create the directory '%s'"), e.filename)
             raise e
 
@@ -306,7 +306,7 @@ class RRDToolPoolManager(object):
         try:
             self.ensureDirectory(self.rrd_base_dir)
             self.checkBinary()
-        except OSError, e:
+        except OSError as e:
             return defer.fail(e)
 
         d = self.pool.start()
@@ -449,7 +449,7 @@ class RRDToolProcessProtocol(protocol.ProcessProtocol):
         try:
             # attention, unicode interdit
             self.transport.write("%s\n" % complete_cmd.encode("utf8"))
-        except Exception, e:
+        except Exception as e:
             self.working = False
             return defer.fail(e)
         return self.deferred
