@@ -34,8 +34,8 @@ def install_i18n(i18ndir, destdir):
 setup(name='vigilo-connector-metro',
         version='4.1.0rc1',
         author='Vigilo Team',
-        author_email='contact@projet-vigilo.org',
-        url='http://www.projet-vigilo.org/',
+        author_email='contact.vigilo@c-s.fr',
+        url='http://www.vigilo-nms.com/',
         description="Vigilo Metrology connector",
         license='http://www.gnu.org/licenses/gpl-2.0.html',
         long_description="Store performance data from the Vigilo "

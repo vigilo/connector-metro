@@ -1,7 +1,7 @@
 # French translations for PACKAGE package.
 # Copyright (C) 2010 THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
-# Vigilo language team <contact@projet-vigilo.org>, 2010.
+# Vigilo language team <contact.vigilo@c-s.fr>, 2010.
 #
 msgid ""
 msgstr ""
