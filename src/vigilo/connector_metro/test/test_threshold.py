@@ -133,11 +133,11 @@ class ThresholdCheckerTestCase(unittest.TestCase):
             if value is None:
                 # Une valeur UNKNOWN ne doit pas générer d'alerte
                 # (on utilise la direction freshness_threshold de Nagios).
-                self.assertEquals(0, len(self.tc.consumer.written),
+                self.assertEqual(0, len(self.tc.consumer.written),
                     "Pas d'alerte pour un état UNKNOWN")
             else:
                 self.assertTrue(len(self.tc.consumer.written) > 0)
-                self.assertEquals(expected_msg, self.tc.consumer.written[-1])
+                self.assertEqual(expected_msg, self.tc.consumer.written[-1])
             # On vide la file de message pour permettre
             # la vérification suivante dans ce test.
             self.tc.consumer.written = []
@@ -193,11 +193,11 @@ class ThresholdCheckerTestCase(unittest.TestCase):
             if value is None:
                 # Une valeur UNKNOWN ne doit pas générer d'alerte
                 # (on utilise la direction freshness_threshold de Nagios).
-                self.assertEquals(0, len(self.tc.consumer.written),
+                self.assertEqual(0, len(self.tc.consumer.written),
                     "Pas d'alerte pour un état UNKNOWN")
             else:
                 self.assertTrue(len(self.tc.consumer.written) > 0)
-                self.assertEquals(expected_msg, self.tc.consumer.written[-1])
+                self.assertEqual(expected_msg, self.tc.consumer.written[-1])
             # On vide la file de message pour permettre
             # la vérification suivante dans ce test.
             self.tc.consumer.written = []
