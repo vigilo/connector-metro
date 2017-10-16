@@ -18,6 +18,12 @@ EnvironmentFile=-/etc/sysconfig/vigilo-connector-metro
 User=vigilo-metro
 Restart=on-failure
 
+# Le signal initial (SIGTERM) ne sera envoyé qu'au processus principal,
+# tandis que le signal final (SIGKILL) sera envoyé à tous les (sous-)processus.
+# Ceci évite que les sous-processus rrdtool ne meurent à cause du SIGTERM,
+# et que le connecteur ne tente de recréer ces processus lors de son arrêt.
+KillMode=mixed
+
 # Evite la création de services dont le nom d'instance n'est pas un nombre,
 # ou bien est un nombre inférieur à 1
 ExecStartPre=/usr/bin/test %i -eq %i -a %i -gt 1
