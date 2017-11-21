@@ -4,23 +4,14 @@ Description=Vigilo connector that stores metrology data in RRD databases
 After=syslog.service
 After=rsyslog.service
 After=network.target
-
 After=rabbitmq-server.service
+After=vigilo-rrdcached.service
 
 
 [Install]
 WantedBy=multi-user.target
 
+
 [Service]
 Type=simple
-EnvironmentFile=-/etc/sysconfig/vigilo-connector-metro
-User=vigilo-metro
-Restart=on-failure
-
-# Le signal initial (SIGTERM) ne sera envoyé qu'au processus principal,
-# tandis que le signal final (SIGKILL) sera envoyé à tous les (sous-)processus.
-# Ceci évite que les sous-processus rrdtool ne meurent à cause du SIGTERM,
-# et que le connecteur ne tente de recréer ces processus lors de son arrêt.
-KillMode=mixed
-
-ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro
+ExecStart=/bin/bash -c 'while /bin/true; do /bin/sleep 3600; done'

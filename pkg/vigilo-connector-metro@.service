@@ -1,20 +1,24 @@
 [Unit]
-Description=Vigilo connector that stores metrology data in RRD databases
+Description=Vigilo connector that stores metrology data in RRD databases #%I
 
 After=syslog.service
 After=rsyslog.service
 After=network.target
-
 After=rabbitmq-server.service
 After=vigilo-rrdcached.service
+BindsTo=vigilo-connector-metro.service
 
 
 [Install]
 WantedBy=multi-user.target
+RequiredBy=vigilo-connector-metro.service
+
 
 [Service]
 Type=simple
+Environment=VIGILO_SETTINGS=/etc/vigilo/connector-metro/settings.ini
 EnvironmentFile=-/etc/sysconfig/vigilo-connector-metro
+EnvironmentFile=-/etc/sysconfig/vigilo-connector-metro-%i
 User=vigilo-metro
 Restart=on-failure
 
@@ -26,5 +30,5 @@ KillMode=mixed
 
 # Evite la création de services dont le nom d'instance n'est pas un nombre,
 # ou bien est un nombre inférieur à 1
-ExecStartPre=/usr/bin/test %i -eq %i -a %i -gt 1
-ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro --config /etc/vigilo/connector-metro/settings-%i.ini --id %i
+ExecStartPre=/usr/bin/test %i -eq %i -a %i -ge 1
+ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro --config ${VIGILO_SETTINGS} --id %i
