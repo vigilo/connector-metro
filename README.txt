@@ -35,7 +35,7 @@ Connector Metro est sous licence `GPL v2`_.
 
 
 .. _documentation officielle: Vigilo_
-.. _Vigilo: http://www.vigilo-nms.com
+.. _Vigilo: https://www.vigilo-nms.com
 .. _RRDtool: http://oss.oetiker.ch/rrdtool
 .. _GPL v2: http://www.gnu.org/licenses/gpl-2.0.html
 

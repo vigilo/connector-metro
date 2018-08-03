@@ -35,7 +35,7 @@ Provides:   %{name}-vigiconf = %{version}-%{release}
 
 %description
 @DESCRIPTION@
-This application is part of the Vigilo Project <http://vigilo-nms.com>
+This application is part of the Vigilo Project <https://www.vigilo-nms.com>
 
 %package    -n vigilo-rrdcached
 Summary:    RRD cache daemon
@@ -48,7 +48,7 @@ Requires(pre):   shadow-utils
 %description -n vigilo-rrdcached
 This contains an init script and configuration files to use the RRD cache
 daemon within Vigilo.
-This package is part of the Vigilo Project <http://vigilo-nms.com>
+This package is part of the Vigilo Project <https://www.vigilo-nms.com>
 
 
 %prep
