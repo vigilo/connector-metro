@@ -24,6 +24,7 @@ def makeService(options):
 
     from vigilo.connector.client import client_factory
     from vigilo.connector.handlers import buspublisher_factory
+    from vigilo.connector.handlers import QueueSubscriber
 
     from vigilo.connector_metro.rrdtool import RRDToolPoolManager
     from vigilo.connector_metro.rrdtool import RRDToolManager
@@ -82,7 +83,8 @@ def makeService(options):
     subs = parseSubscriptions(settings)
     queue = settings["bus"]["queue"]
     queue_messages_ttl = int(settings['bus'].get('queue_messages_ttl', 0))
-    bustorrdtool.subscribe(queue, queue_messages_ttl, subs)
+    prefetch_count = int(settings['bus'].get('prefetch_count', QueueSubscriber.prefetch_count))
+    bustorrdtool.subscribe(queue, queue_messages_ttl, subs, prefetch_count=prefetch_count)
     providers.append(bustorrdtool)
 
     # Statistiques
