@@ -33,6 +33,12 @@ subscriptions = perf
 # Le trafic lié au bus doit-il être enregistré dans les logs ?
 log_traffic = False
 
+# Nombre de messages à récupérer simultanément depuis le bus.
+# La valeur par défaut (5) convient pour la plupart des déploiements.
+# Une valeur plus élevée peut améliorer les performances pour les parcs
+# de grande taille. Néanmoins, une valeur trop élevée peut également
+# dégrader les performances.
+#prefetch_count = 5
 
 [connector-metro]
 # Fichier de config distribué par VigiConf
