@@ -24,6 +24,7 @@ def makeService(options):
 
     from vigilo.connector.client import client_factory
     from vigilo.connector.handlers import buspublisher_factory
+    from vigilo.connector.handlers import QueueSubscriber
 
     from vigilo.connector_metro.rrdtool import RRDToolPoolManager
     from vigilo.connector_metro.rrdtool import RRDToolManager
@@ -34,8 +35,14 @@ def makeService(options):
     root_service = service.MultiService()
 
     # Client du bus
-    client = client_factory(settings)
-    client.setServiceParent(root_service)
+    client_in = client_factory(settings)
+    client_in.setName("vigilo_client_in")
+    client_in.setServiceParent(root_service)
+
+    client_out = client_factory(settings)
+    client_out.setName("vigilo_client_out")
+    client_out.setServiceParent(root_service)
+
     providers = []
 
     # Configuration
@@ -70,7 +77,7 @@ def makeService(options):
     # Gestion des seuils
     if must_check_th:
         threshold_checker = ThresholdChecker(rrdtool, confdb)
-        bus_publisher = buspublisher_factory(settings, client)
+        bus_publisher = buspublisher_factory(settings, client_out)
         bus_publisher.registerProducer(threshold_checker, streaming=True)
         providers.append(bus_publisher)
     else:
@@ -78,17 +85,18 @@ def makeService(options):
 
     # Gestionnaire principal des messages
     bustorrdtool = BusToRRDtool(confdb, rrdtool, threshold_checker)
-    bustorrdtool.setClient(client)
+    bustorrdtool.setClient(client_in)
     subs = parseSubscriptions(settings)
     queue = settings["bus"]["queue"]
     queue_messages_ttl = int(settings['bus'].get('queue_messages_ttl', 0))
-    bustorrdtool.subscribe(queue, queue_messages_ttl, subs)
+    prefetch_count = int(settings['bus'].get('prefetch_count', QueueSubscriber.prefetch_count))
+    bustorrdtool.subscribe(queue, queue_messages_ttl, subs, prefetch_count=prefetch_count)
     providers.append(bustorrdtool)
 
     # Statistiques
     from vigilo.connector.status import statuspublisher_factory
 
-    status_publisher = statuspublisher_factory(settings, client,
+    status_publisher = statuspublisher_factory(settings, client_out,
                                                providers=providers)
 
     return root_service
