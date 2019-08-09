@@ -31,4 +31,4 @@ KillMode=mixed
 # Evite la création de services dont le nom d'instance n'est pas un nombre,
 # ou bien est un nombre inférieur à 1
 ExecStartPre=/usr/bin/test %i -eq %i -a %i -ge 1
-ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -n vigilo-metro --config ${VIGILO_SETTINGS} --id %i
+ExecStart=/usr/bin/vigilo-connector-metro -d /var/lib/vigilo/rrd --pidfile '' -l /dev/null -n vigilo-metro --config ${VIGILO_SETTINGS} --id %i
