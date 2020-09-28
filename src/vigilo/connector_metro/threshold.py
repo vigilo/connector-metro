@@ -11,6 +11,7 @@ Il s'agit d'un port d'une partie du code du collector.
 import time
 
 from zope.interface import implements
+from twisted.internet import defer
 from twisted.internet.interfaces import IPushProducer
 
 from vigilo.connector_metro.exceptions import MissingConfigurationData
@@ -69,7 +70,23 @@ class ThresholdChecker(object):
                                         cache=True)
 
         def get_last_value(ds, perf):
-            last = self.rrdtool.getLastValue(ds, perf)
+            if ds["type"].startswith("DIFF-"):
+                value = perf["value"]
+                prev = perf["prev_value"]
+                if value == u'U':
+                    # On ne stocke pas les valeurs None
+                    diff = prev
+                else:
+                    value = float(value)
+                    if prev is None or prev > value:
+                        # Pas de valeur précédente ou overflow;
+                        # on fait comme si prev valait 0.
+                        diff = value
+                    else:
+                        diff = value - prev
+                last = defer.succeed(diff)
+            else:
+                last = self.rrdtool.getLastValue(ds, perf)
             last.addCallback(self._compare_thresholds, ds)
             return last
         def eb(f):

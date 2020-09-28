@@ -81,7 +81,7 @@ class ThresholdCheckerTestCase(unittest.TestCase):
 
     @deferred(timeout=30)
     def test_alerts_required_attrs(self):
-        self.tc.confdb.get_datasource.return_value = defer.succeed(None)
+        self.tc.confdb.get_datasource.return_value = defer.succeed({"type": "GAUGE"})
         self.tc.rrdtool.getLastValue.return_value = defer.fail(
                 MissingConfigurationData("dummy"))
         d = self.tc.checkMessage({"host": "dummy", "datasource": "dummy"})
