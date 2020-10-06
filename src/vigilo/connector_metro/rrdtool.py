@@ -99,6 +99,15 @@ class RRDToolManager(object):
         )
         return old_filename
 
+    def _rememberPreviousValue(self, last, msgdata):
+        msgdata["prev_value"] = last
+        return msgdata
+
+    def _updateValue(self, msgdata, filename, has_threshold):
+        cmd = '%(timestamp)s:%(value)s' % msgdata
+        d = self.rrdtool.run("update", filename, cmd, no_rrdcached=has_threshold)
+        d.addCallback(lambda dummy_: msgdata)
+        return d
 
     def processMessage(self, msgdata):
         """
@@ -106,12 +115,21 @@ class RRDToolManager(object):
         """
         if msgdata is None:
             return defer.succeed(None)
-        cmd = '%(timestamp)s:%(value)s' % msgdata
+
         filename = self.getFilename(msgdata)
-        d2 = self.rrdtool.run("update", filename, cmd,
-                              no_rrdcached=msgdata["has_thresholds"])
-        d2.addCallback(lambda x: msgdata)
-        return d2
+        th = msgdata["has_thresholds"]
+
+        # Pour le moment on ne supporte que ça.
+        # Le test d'égalité évite aussi de devoir gérer th == False.
+        if th == "DIFF-GAUGE":
+            d = self.rrdtool.run("lastupdate", filename, [])
+            d.addCallback(parse_rrdtool_response, filename)
+            d.addCallback(self._rememberPreviousValue, msgdata)
+        else:
+            d = defer.succeed(msgdata)
+
+        d.addCallback(self._updateValue, filename, th)
+        return d
 
     def createIfNeeded(self, msgdata):
         """
@@ -171,8 +189,11 @@ class RRDToolManager(object):
                            (rra["type"], rra["xff"],
                             rra["RRA_step"], rra["rows"]))
 
+        ds_type = ds["type"]
+        if ds_type.startswith('DIFF-'):
+            ds_type = ds_type[5:]
         rrd_cmd.append("DS:DS:%s:%s:%s:%s" %
-                       (ds["type"], ds["heartbeat"], ds["min"], ds["max"]))
+                       (ds_type, ds["heartbeat"], ds["min"], ds["max"]))
 
         try:
             yield self.rrdtool.run("create", filename, rrd_cmd)
