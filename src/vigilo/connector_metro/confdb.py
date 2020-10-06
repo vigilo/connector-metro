@@ -52,14 +52,12 @@ class MetroConfDB(ConfDB):
     def list_thresholds(self):
         if self._db is None:
             return defer.succeed(None)
-        result = self._db.runQuery("SELECT hostname, name FROM perfdatasource "
+        result = self._db.runQuery("SELECT hostname, name, type FROM perfdatasource "
                                    "WHERE warning_threshold IS NOT NULL "
                                    "AND critical_threshold IS NOT NULL")
         # Pas de conversion en UTF-8 : has_threshold() attend de l'unicode.
-        result.addCallback(lambda results: [ (r[0], r[1]) for r in results ])
-        def cache_thresholds(thresholds):
-            self._cache["has_threshold"] = thresholds
-            return thresholds
+        def cache_thresholds(results):
+            self._cache["has_threshold"] = dict( ((r[0], r[1]), r[2]) for r in results )
         result.addCallback(cache_thresholds)
         return result
 
@@ -88,15 +86,15 @@ class MetroConfDB(ConfDB):
         if self._db is None:
             return defer.succeed(False)
         if self._cache["has_threshold"] is not None:
-            return defer.succeed((hostname, dsname)
-                                 in self._cache["has_threshold"])
-        result = self._db.runQuery("SELECT 1 FROM perfdatasource "
+            return defer.succeed(self._cache["has_threshold"].get(
+                                    (hostname, dsname), False))
+        result = self._db.runQuery("SELECT type FROM perfdatasource "
                                    "WHERE hostname = ? AND name = ? "
                                    "AND (warning_threshold IS NOT NULL "
                                    "     AND critical_threshold IS NOT NULL) "
                                    "LIMIT 1",
                                    (hostname, dsname))
-        result.addCallback(lambda results: bool(len(results)))
+        result.addCallback(lambda results: results[0][0] if results else False)
         return result
 
 

@@ -139,8 +139,7 @@ class BusToRRDtool(MessageHandler):
     def _check_thresholds(self, perf, sync=False):
         if perf is None:
             return None
-        if (self.threshold_checker is None or
-                not perf["has_thresholds"]):
+        if (self.threshold_checker is None or not perf["has_thresholds"]):
             return perf
         return self.threshold_checker.checkMessage(perf)
 
