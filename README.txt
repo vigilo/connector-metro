@@ -10,23 +10,19 @@ Pour les détails du fonctionnement du Connector Metro, se reporter à la
 
 Dépendances
 -----------
-Vigilo nécessite une version de Python supérieure ou égale à 2.5. Le chemin de
-l'exécutable python peut être passé en paramètre du ``make install`` de la
-façon suivante::
-
-    make install PYTHON=/usr/bin/python2.6
+Vigilo nécessite une version de Python supérieure ou égale à 2.7.
 
 Le Connector Metro a besoin de RRDtool_ et des modules Python suivants :
 
-- setuptools (ou distribute)
+- setuptools
 - vigilo-common
 - vigilo-connector
 
 
 Installation
 ------------
-L'installation se fait par la commande ``make install`` (à exécuter en
-``root``).
+L'installation se fait par la commande ``python setup.py install``
+(depuis le compte ``root``).
 
 
 License

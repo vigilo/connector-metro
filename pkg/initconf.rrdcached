@@ -1,7 +1,0 @@
-# Configuration de rrdcached
-
-# Utilisateur systeme. Doit etre identique a celui de connector-metro
-#USER="vigilo-metro"
-
-# Options par defaut:
-#OPTIONS="-m 666 -l /var/lib/vigilo/connector-metro/rrdcached.sock"

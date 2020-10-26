@@ -6,8 +6,16 @@
 import os, sys
 from setuptools import setup, find_packages
 
-sysconfdir = os.getenv("SYSCONFDIR", "/etc")
-localstatedir = os.getenv("LOCALSTATEDIR", "/var")
+cmdclass = {}
+try:
+    from vigilo.common.commands import install_data
+except ImportError:
+    pass
+else:
+    cmdclass['install_data'] = install_data
+
+os.environ.setdefault('SYSCONFDIR', '/etc')
+os.environ.setdefault('LOCALSTATEDIR', '/var')
 
 tests_require = [
     'coverage',
@@ -68,14 +76,13 @@ setup(name='vigilo-connector-metro',
             ],
         },
         package_dir={'': 'src'},
+        test_suite='nose.collector',
+        cmdclass=cmdclass,
         data_files=[
-                    (os.path.join(sysconfdir, "vigilo/connector-metro"),
-                        ["settings.ini"]),
-                    (os.path.join(localstatedir, "lib/vigilo/connector-metro"), []),
-                    (os.path.join(localstatedir, "log/vigilo/connector-metro"), []),
-                    (os.path.join(localstatedir, "lib/vigilo/rrd"), []),
-                    (os.path.join(localstatedir, "run/vigilo-connector-metro"), []),
-                    (os.path.join(localstatedir, "run/vigilo-rrdcached"), []),
-                   ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
+            (os.path.join("@SYSCONFDIR@", "vigilo", "connector-metro"), ["settings.ini.in"]),
+            (os.path.join("@LOCALSTATEDIR@", "lib", "vigilo", "connector-metro"), []),
+            (os.path.join("@LOCALSTATEDIR@", "log", "vigilo", "connector-metro"), []),
+            (os.path.join("@LOCALSTATEDIR@", "lib", "vigilo", "rrd"), []),
+           ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
         )
 
