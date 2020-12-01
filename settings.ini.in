@@ -42,10 +42,10 @@ log_traffic = False
 
 [connector-metro]
 # Fichier de config distribué par VigiConf
-config = @SYSCONFDIR@/vigilo/vigiconf/prod/connector-metro.db
+config = @sysconfdir@/vigilo/vigiconf/prod/connector-metro.db
 
 # Le dossier où seront stockés les fichiers RRD
-rrd_base_dir = @LOCALSTATEDIR@/lib/vigilo/rrd
+rrd_base_dir = @localstatedir@/lib/vigilo/rrd
 
 # Cette option permet de configurer l'arborescence des dossiers dans lesquels
 # seront stockés les RRD. Les valeurs suivantes sont possibles :
@@ -69,7 +69,7 @@ rrd_bin = /usr/bin/rrdtool
 #rrd_processes = 4
 
 # Utilisation du démon de mise à jour RRDCacheD. Nécessite RRDTool >= 1.4
-#rrdcached = @LOCALSTATEDIR@/lib/vigilo/connector-metro/rrdcached.sock
+#rrdcached = @localstatedir@/lib/vigilo/connector-metro/rrdcached.sock
 
 # Vérifier les seuils des indicateurs concernés. À désactiver s'il s'agit d'une
 # instance de connector-metro dédiée à la sauvegarde. Par défaut: True
@@ -140,7 +140,7 @@ args = '/dev/log', 'daemon'
 [handler_errors]
 level = ERROR
 class = handlers.RotatingFileHandler
-args = ('@LOCALSTATEDIR@/log/vigilo/connector-metro/error.log', 'a', 1024*1024*10, 5)
+args = ('@localstatedir@/log/vigilo/connector-metro/error.log', 'a', 1024*1024*10, 5)
 formatter = errorFormatter
 
 [formatter_consoleFormatter]

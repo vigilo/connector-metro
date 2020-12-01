@@ -6,16 +6,7 @@
 import os, sys
 from setuptools import setup, find_packages
 
-cmdclass = {}
-try:
-    from vigilo.common.commands import install_data
-except ImportError:
-    pass
-else:
-    cmdclass['install_data'] = install_data
-
-os.environ.setdefault('SYSCONFDIR', '/etc')
-os.environ.setdefault('LOCALSTATEDIR', '/var')
+setup_requires = ['vigilo-common'] if not os.environ.get('CI') else []
 
 tests_require = [
     'coverage',
@@ -49,6 +40,7 @@ setup(name='vigilo-connector-metro',
         long_description="Store performance data from the Vigilo "
                          "message bus in RRD files.",
         zip_safe=False, # pour pouvoir écrire le dropin.cache de twisted
+        setup_requires=setup_requires,
         install_requires=[
             'setuptools',
             'vigilo-common',
@@ -77,12 +69,21 @@ setup(name='vigilo-connector-metro',
         },
         package_dir={'': 'src'},
         test_suite='nose.collector',
-        cmdclass=cmdclass,
+        vigilo_build_vars={
+            'sysconfdir': {
+                'default': '/etc',
+                'description': "installation directory for configuration files",
+            },
+            'localstatedir': {
+                'default': '/var',
+                'description': "local state directory",
+            },
+        },
         data_files=[
-            (os.path.join("@SYSCONFDIR@", "vigilo", "connector-metro"), ["settings.ini.in"]),
-            (os.path.join("@LOCALSTATEDIR@", "lib", "vigilo", "connector-metro"), []),
-            (os.path.join("@LOCALSTATEDIR@", "log", "vigilo", "connector-metro"), []),
-            (os.path.join("@LOCALSTATEDIR@", "lib", "vigilo", "rrd"), []),
+            (os.path.join("@sysconfdir@", "vigilo", "connector-metro"), ["settings.ini.in"]),
+            (os.path.join("@localstatedir@", "lib", "vigilo", "connector-metro"), []),
+            (os.path.join("@localstatedir@", "log", "vigilo", "connector-metro"), []),
+            (os.path.join("@localstatedir@", "lib", "vigilo", "rrd"), []),
            ] + install_i18n("i18n", os.path.join(sys.prefix, 'share', 'locale')),
         )
 
